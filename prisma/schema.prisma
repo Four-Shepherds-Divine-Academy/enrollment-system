@@ -1,0 +1,194 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Student {
+  id               String           @id @default(cuid())
+  lrn              String?          @unique // Learner Reference Number
+  firstName        String
+  middleName       String?
+  lastName         String
+  fullName         String
+  gender           Gender
+  contactNumber    String
+  dateOfBirth      DateTime
+
+  // Philippine Address System
+  houseNumber      String?          // House/Unit/Block Number
+  street           String?          // Street name or Sitio
+  subdivision      String?          // Subdivision/Village name
+  barangay         String           // Barangay
+  city             String           // City/Municipality
+  province         String           // Province
+  zipCode          String?          // Postal/ZIP code
+
+  // Guardian Information
+  parentGuardian   String
+
+  // Academic Information
+  gradeLevel       String
+  section          Section?
+  enrollmentStatus EnrollmentStatus @default(PENDING)
+  isTransferee     Boolean          @default(false) // Is transferee from another school
+  previousSchool   String?          // Previous school name if transferee
+  remarks          String?
+
+  // Enrollment History
+  enrollments      Enrollment[]
+  notifications    Notification[]
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([fullName, dateOfBirth])
+  @@index([lrn])
+  @@index([gradeLevel])
+  @@index([enrollmentStatus])
+  @@index([barangay])
+  @@index([city])
+}
+
+model AcademicYear {
+  id               String           @id @default(cuid())
+  name             String           @unique // e.g., "2024-2025"
+  startDate        DateTime
+  endDate          DateTime?
+  isActive         Boolean          @default(false)
+
+  enrollments      Enrollment[]
+  gradeSections    GradeSection[]
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([isActive])
+}
+
+model GradeSection {
+  id               String           @id @default(cuid())
+  academicYearId   String
+  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  gradeLevel       String           // e.g., "Kinder 1", "Grade 1"
+  section          Section          // e.g., Enthusiasm, Obedience
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([academicYearId, gradeLevel, section])
+  @@index([academicYearId])
+  @@index([gradeLevel])
+}
+
+model Enrollment {
+  id               String           @id @default(cuid())
+  studentId        String
+  student          Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  academicYearId   String
+  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id])
+
+  schoolYear       String           // e.g., "2024-2025" (denormalized for quick access)
+  gradeLevel       String
+  section          Section?
+  enrollmentDate   DateTime         @default(now())
+  status           EnrollmentStatus @default(ENROLLED)
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([studentId])
+  @@index([academicYearId])
+  @@index([schoolYear])
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("admin")
+
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  adminId     String
+  admin       Admin            @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  type        NotificationType
+  title       String
+  message     String
+  isRead      Boolean          @default(false)
+
+  // Related entities
+  studentId   String?
+  student     Student?         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  enrollmentId String?
+
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([adminId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum Gender {
+  Male
+  Female
+}
+
+enum EnrollmentStatus {
+  PENDING
+  ENROLLED
+  TRANSFERRED
+  DROPPED
+}
+
+enum NotificationType {
+  ENROLLMENT
+  SYSTEM
+  ALERT
+}
+
+enum Section {
+  // Kinder sections
+  Enthusiasm
+  Generosity
+
+  // Elementary sections
+  Obedience
+  Hospitality
+  Simplicity
+  Benevolence
+  Sincerity
+  Responsibility
+
+  // Junior High sections
+  Perseverance
+  Integrity
+
+  // Senior High sections
+  Optimism
+  Dependability
+}

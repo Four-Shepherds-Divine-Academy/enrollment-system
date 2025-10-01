@@ -1,0 +1,198 @@
+import { auth, signOut } from '@/auth'
+import { redirect } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import { Toaster } from 'sonner'
+import { prisma } from '@/lib/prisma'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  User,
+  LogOut,
+  Settings,
+  FileText,
+  Home,
+  Calendar,
+  Users,
+  UserPlus,
+  ChevronDown
+} from 'lucide-react'
+import { NotificationCenter } from '@/components/notification-center'
+
+export default async function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const session = await auth()
+
+  if (!session) {
+    redirect('/admin/login')
+  }
+
+  // Fetch active academic year
+  const activeYear = await prisma.academicYear.findFirst({
+    where: { isActive: true },
+    select: {
+      id: true,
+      name: true,
+      _count: {
+        select: { enrollments: true },
+      },
+    },
+  })
+
+  // Get user initials for avatar
+  const userInitials = session.user?.name
+    ?.split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || 'AD'
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-right" />
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo and Brand */}
+            <div className="flex items-center space-x-8">
+              <Link href="/admin/dashboard" className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">4S</span>
+                </div>
+                <h1 className="text-xl font-bold text-gray-900">
+                  {process.env.APP_NAME || '4SDA'} Admin
+                </h1>
+              </Link>
+
+            </div>
+
+            {/* Right Side - Active Year, Notifications & User Menu */}
+            <div className="flex items-center space-x-4">
+              {activeYear && (
+                <div className="hidden sm:flex items-center px-3 py-1.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg">
+                  <span className="text-xs font-semibold text-green-700 mr-1">
+                    ACTIVE:
+                  </span>
+                  <span className="text-sm font-bold text-green-900">
+                    SY {activeYear.name}
+                  </span>
+                  <div className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                </div>
+              )}
+
+              {/* Notification Center */}
+              <NotificationCenter />
+
+              {/* User Dropdown Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center gap-2 hover:bg-gray-100">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-semibold">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="hidden md:flex flex-col items-start">
+                      <span className="text-sm font-medium text-gray-900">
+                        {session.user?.name}
+                      </span>
+                      <span className="text-xs text-gray-500">{session.user?.role}</span>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{session.user?.name}</p>
+                      <p className="text-xs text-gray-500">{session.user?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+
+                  {/* Navigation Items */}
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard" className="flex items-center cursor-pointer">
+                      <Home className="mr-2 h-4 w-4" />
+                      <span>Dashboard</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/academic-years" className="flex items-center cursor-pointer">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      <span>Academic Years</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/students" className="flex items-center cursor-pointer">
+                      <Users className="mr-2 h-4 w-4" />
+                      <span>Students</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/enroll" className="flex items-center cursor-pointer">
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      <span>Enroll Student</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/reports" className="flex items-center cursor-pointer">
+                      <FileText className="mr-2 h-4 w-4" />
+                      <span>Reports</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  {/* Future menu items placeholder */}
+                  <DropdownMenuItem disabled>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  {/* Sign Out */}
+                  <DropdownMenuItem asChild>
+                    <form
+                      action={async () => {
+                        'use server'
+                        await signOut({ redirectTo: '/admin/login' })
+                      }}
+                      className="w-full"
+                    >
+                      <button type="submit" className="flex items-center w-full text-red-600">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Sign Out</span>
+                      </button>
+                    </form>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {children}
+      </main>
+    </div>
+  )
+}
