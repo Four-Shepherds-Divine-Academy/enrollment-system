@@ -66,6 +66,9 @@ const eslintConfig = [
       "react-hooks/exhaustive-deps": "warn",
       "react-hooks/rules-of-hooks": "error",
 
+      // React rules
+      "react/no-unescaped-entities": "warn",
+
       // General rules
       "prefer-const": "warn",
       "no-console": ["warn", { allow: ["warn", "error"] }],

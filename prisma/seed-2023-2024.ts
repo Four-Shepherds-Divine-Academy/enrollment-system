@@ -316,11 +316,9 @@ async function main() {
   console.log(`Academic Year: ${academicYear.name}`)
 }
 
-main()
+void main()
   .catch((e) => {
     console.error(e)
     process.exit(1)
   })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+  .finally(() => void prisma.$disconnect())

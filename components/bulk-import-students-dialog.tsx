@@ -105,12 +105,12 @@ export function BulkImportStudentsDialog({
   // Fetch students when source year changes
   useEffect(() => {
     if (sourceYearId && open) {
-      fetchStudents()
+      void fetchStudents()
     } else {
       setStudents([])
       setSelectedStudentIds(new Set())
     }
-  }, [sourceYearId, open])
+  }, [sourceYearId, open, fetchStudents])
 
   const fetchStudents = async () => {
     setLoading(true)

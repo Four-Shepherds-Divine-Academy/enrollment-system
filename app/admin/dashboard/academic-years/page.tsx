@@ -95,7 +95,7 @@ export default function AcademicYearsPage() {
       return response.json()
     },
     onSuccess: (newYear) => {
-      queryClient.invalidateQueries({ queryKey: ['academic-years'] })
+      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
       setName('')
       setStartDate('')
       setEndDate('')
@@ -123,7 +123,7 @@ export default function AcademicYearsPage() {
       return response.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['academic-years'] })
+      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
       toast.success('Academic year switched successfully!')
     },
   })
@@ -139,7 +139,7 @@ export default function AcademicYearsPage() {
       return response.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['academic-years'] })
+      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
       toast.success('Academic year ended successfully!', {
         description: 'The academic year has been closed.',
       })
@@ -157,7 +157,7 @@ export default function AcademicYearsPage() {
       return response.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['academic-years'] })
+      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
     },
   })
 
@@ -221,7 +221,7 @@ export default function AcademicYearsPage() {
       return response.json()
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['academic-years'] })
+      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
       toast.success('Academic year deleted successfully!', {
         description: `Deleted ${data.deletedYear} with ${data.deletedEnrollments} enrollments`,
       })
@@ -269,7 +269,7 @@ export default function AcademicYearsPage() {
       return response.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['academic-years'] })
+      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
       toast.success('Academic year updated successfully!')
       setShowEditDialog(false)
       setEditData(null)
@@ -713,7 +713,7 @@ export default function AcademicYearsPage() {
           targetAcademicYear={importTargetYear}
           availableYears={academicYears.filter((y) => y.id !== importTargetYear.id)}
           onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['academic-years'] })
+            void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
           }}
         />
       )}

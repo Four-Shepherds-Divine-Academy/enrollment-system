@@ -1,4 +1,4 @@
-import { Gender, EnrollmentStatus, Section } from '@prisma/client'
+import type { Gender, EnrollmentStatus, Section } from '@prisma/client'
 
 // Student Types
 export type Student = {

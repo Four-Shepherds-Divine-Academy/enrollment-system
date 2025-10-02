@@ -83,11 +83,11 @@ export function EnrollmentForm() {
         } else {
           setNoActiveYear(true)
         }
-      } catch (error) {
+      } catch (_error) {
         setNoActiveYear(true)
       }
     }
-    checkActiveYear()
+    void checkActiveYear()
   }, [])
 
   const form = useForm<StudentFormData>({
@@ -159,7 +159,7 @@ export function EnrollmentForm() {
       }
     }
 
-    const debounce = setTimeout(searchStudents, 500)
+    const debounce = setTimeout(() => void searchStudents(), 500)
     return () => clearTimeout(debounce)
   }, [firstName, middleName, lastName, dateOfBirth, isPreviouslyEnrolled])
 
@@ -185,7 +185,7 @@ export function EnrollmentForm() {
       }
     }
 
-    const debounce = setTimeout(searchManually, 500)
+    const debounce = setTimeout(() => void searchManually(), 500)
     return () => clearTimeout(debounce)
   }, [manualSearchQuery, isPreviouslyEnrolled])
 
@@ -243,7 +243,7 @@ export function EnrollmentForm() {
       return response.json()
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['students'] })
+      void queryClient.invalidateQueries({ queryKey: ['students'] })
       form.reset()
       setMatchingStudents([])
       setSelectedStudentId(null)

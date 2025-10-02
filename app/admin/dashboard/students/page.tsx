@@ -194,7 +194,7 @@ export default function StudentsListPage() {
       return response.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] })
+      void queryClient.invalidateQueries({ queryKey: ['students'] })
       toast.success('Student deleted successfully')
       setDeleteDialogOpen(false)
       setStudentToDelete(null)
@@ -244,7 +244,7 @@ export default function StudentsListPage() {
       return response.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] })
+      void queryClient.invalidateQueries({ queryKey: ['students'] })
       toast.success('Student switched successfully')
       setSwitchDialogOpen(false)
       setViewDetailsOpen(false)

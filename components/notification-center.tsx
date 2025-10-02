@@ -60,7 +60,7 @@ export function NotificationCenter() {
       return response.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
     },
   })
 
@@ -74,7 +74,7 @@ export function NotificationCenter() {
       return response.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
       toast.success('All notifications marked as read')
     },
   })
@@ -88,7 +88,7 @@ export function NotificationCenter() {
       return response.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
       toast.success('Notification deleted')
     },
   })
