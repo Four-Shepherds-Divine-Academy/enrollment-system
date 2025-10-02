@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { studentSchema } from '@/lib/validations/student'
 import { z } from 'zod'
 import { auth } from '@/auth'
 
 // GET all students with search and filters
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url)
     const gradeLevel = searchParams.get('gradeLevel')
@@ -13,7 +15,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const academicYear = searchParams.get('academicYear')
 
-    const where: any = {}
+    const where: Prisma.StudentWhereInput = {}
 
     // Grade level filter
     if (gradeLevel && gradeLevel !== 'All Grades') {
@@ -75,7 +77,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST create new student or re-enroll existing student
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json()
     const validatedData = studentSchema.parse(body)

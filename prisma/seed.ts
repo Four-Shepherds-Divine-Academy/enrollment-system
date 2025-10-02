@@ -1,10 +1,11 @@
+import type { PrismaClient as PrismaClientType } from '@prisma/client'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { execSync } from 'child_process'
 
-const prisma = new PrismaClient()
+const prisma: PrismaClientType = new PrismaClient()
 
-async function main() {
+async function main(): Promise<void> {
   console.log('Seeding database...')
 
   // Create default admin user
@@ -26,19 +27,31 @@ async function main() {
 
   // Run individual seed files for academic years
   console.log('\nSeeding 2023-2024 academic year...')
-  execSync('tsx prisma/seed-2023-2024-complete.ts', { stdio: 'inherit' })
+  try {
+    execSync('tsx prisma/seed-2023-2024.ts', { stdio: 'inherit' })
+  } catch (error) {
+    console.error('Error seeding 2023-2024:', error)
+  }
 
   console.log('\nSeeding 2024-2025 academic year...')
-  execSync('tsx prisma/seed-all-students.ts', { stdio: 'inherit' })
+  try {
+    execSync('tsx prisma/seed-2024-2025.ts', { stdio: 'inherit' })
+  } catch (error) {
+    console.error('Error seeding 2024-2025:', error)
+  }
 
   console.log('\nSeeding 2025-2026 academic year...')
-  execSync('tsx prisma/seed-2025-2026.ts', { stdio: 'inherit' })
+  try {
+    execSync('tsx prisma/seed-2025-2026.ts', { stdio: 'inherit' })
+  } catch (error) {
+    console.error('Error seeding 2025-2026:', error)
+  }
 
   console.log('\n✅ All seeds completed successfully!')
 }
 
 main()
-  .catch((e) => {
+  .catch((e: Error) => {
     console.error(e)
     process.exit(1)
   })

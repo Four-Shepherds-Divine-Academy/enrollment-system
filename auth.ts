@@ -1,9 +1,10 @@
 import NextAuth from 'next-auth'
+import type { NextAuthConfig } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+const authConfig: NextAuthConfig = {
   providers: [
     Credentials({
       credentials: {
@@ -51,8 +52,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user && token.userId) {
-        session.user.id = token.userId
-        session.user.role = token.userRole
+        session.user.id = token.userId as string
+        session.user.role = token.userRole as string
       }
       return session
     },
@@ -60,4 +61,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   pages: {
     signIn: '/admin/login',
   },
-})
+}
+
+export const { handlers, signIn, signOut, auth } = NextAuth(authConfig)

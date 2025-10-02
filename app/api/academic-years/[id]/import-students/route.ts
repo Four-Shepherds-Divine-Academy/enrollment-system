@@ -15,7 +15,7 @@ const importSchema = z.object({
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const { id: targetAcademicYearId } = await params
     const body = await request.json()
@@ -180,7 +180,7 @@ function getNextGradeLevel(currentGrade: string): string {
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const { id: targetAcademicYearId } = await params
     const { searchParams } = new URL(request.url)

@@ -18,7 +18,7 @@ const fullUpdateSchema = z.object({
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const { id } = await params
     const body = await request.json()
@@ -54,7 +54,7 @@ export async function PUT(
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const { id } = await params
     const body = await request.json()
@@ -102,7 +102,7 @@ export async function PATCH(
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const { id } = await params
     console.log('Received request for academic year ID:', id)
@@ -161,7 +161,7 @@ export async function POST(
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const { id } = await params
     console.log('Deleting academic year ID:', id)

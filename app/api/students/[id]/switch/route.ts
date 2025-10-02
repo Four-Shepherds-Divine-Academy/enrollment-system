@@ -11,7 +11,7 @@ const switchSchema = z.object({
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const { id } = await params
     const body = await request.json()

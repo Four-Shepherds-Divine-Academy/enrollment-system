@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
   try {
     const session = await auth()
 
@@ -16,12 +17,13 @@ export async function PATCH(
       )
     }
 
+    const { id } = await params
     const body = await request.json()
     const { isRead } = body
 
     // Verify notification belongs to the admin
     const notification = await prisma.notification.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!notification || notification.adminId !== session.user.id) {
@@ -32,7 +34,7 @@ export async function PATCH(
     }
 
     const updatedNotification = await prisma.notification.update({
-      where: { id: params.id },
+      where: { id },
       data: { isRead },
       include: {
         student: {
@@ -59,8 +61,8 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
   try {
     const session = await auth()
 
@@ -71,9 +73,11 @@ export async function DELETE(
       )
     }
 
+    const { id } = await params
+
     // Verify notification belongs to the admin
     const notification = await prisma.notification.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!notification || notification.adminId !== session.user.id) {
@@ -84,7 +88,7 @@ export async function DELETE(
     }
 
     await prisma.notification.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })

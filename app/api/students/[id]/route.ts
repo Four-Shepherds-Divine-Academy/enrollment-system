@@ -6,11 +6,12 @@ import { z } from 'zod'
 // GET single student
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
   try {
+    const { id } = await params
     const student = await prisma.student.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!student) {
@@ -30,12 +31,13 @@ export async function GET(
 // PUT update student
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
   try {
+    const { id } = await params
     // Check if student exists
     const existingStudent = await prisma.student.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         enrollments: {
           include: {
@@ -86,7 +88,7 @@ export async function PUT(
 
     // Update student
     const student = await prisma.student.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...validatedData,
         fullName,
@@ -126,12 +128,13 @@ export async function PUT(
 // DELETE student
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
   try {
+    const { id } = await params
     // Check if student exists
     const existingStudent = await prisma.student.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         enrollments: {
           include: {
@@ -185,12 +188,12 @@ export async function DELETE(
 
     // Delete enrollments first
     await prisma.enrollment.deleteMany({
-      where: { studentId: params.id },
+      where: { studentId: id },
     })
 
     // Delete student
     await prisma.student.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })
