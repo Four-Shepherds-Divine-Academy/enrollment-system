@@ -10,7 +10,7 @@ export async function PATCH(
   try {
     const session = await auth()
 
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -20,18 +20,6 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
     const { isRead } = body
-
-    // Verify notification belongs to the admin
-    const notification = await prisma.notification.findUnique({
-      where: { id },
-    })
-
-    if (!notification || notification.adminId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'Notification not found' },
-        { status: 404 }
-      )
-    }
 
     const updatedNotification = await prisma.notification.update({
       where: { id },
@@ -66,7 +54,7 @@ export async function DELETE(
   try {
     const session = await auth()
 
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -74,18 +62,6 @@ export async function DELETE(
     }
 
     const { id } = await params
-
-    // Verify notification belongs to the admin
-    const notification = await prisma.notification.findUnique({
-      where: { id },
-    })
-
-    if (!notification || notification.adminId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'Notification not found' },
-        { status: 404 }
-      )
-    }
 
     await prisma.notification.delete({
       where: { id },

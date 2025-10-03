@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { studentSchema } from '@/lib/validations/student'
 import { z } from 'zod'
+import { auth } from '@/auth'
 
 // GET single student
 export async function GET(
@@ -12,6 +13,15 @@ export async function GET(
     const { id } = await params
     const student = await prisma.student.findUnique({
       where: { id },
+      include: {
+        section: {
+          select: {
+            id: true,
+            name: true,
+            gradeLevel: true,
+          },
+        },
+      },
     })
 
     if (!student) {
@@ -77,6 +87,28 @@ export async function PUT(
     const body = await request.json()
     const validatedData = studentSchema.parse(body)
 
+    // Normalize LRN - convert empty string to null
+    const normalizedLrn = validatedData.lrn && validatedData.lrn.trim() !== ''
+      ? validatedData.lrn.trim()
+      : null
+
+    // Check if LRN is being changed and already exists for another student
+    if (normalizedLrn && normalizedLrn !== existingStudent.lrn) {
+      const lrnExists = await prisma.student.findFirst({
+        where: {
+          lrn: normalizedLrn,
+          id: { not: id },
+        },
+      })
+
+      if (lrnExists) {
+        return NextResponse.json(
+          { error: 'A student with this LRN already exists. Please check the LRN or use a different one.' },
+          { status: 409 }
+        )
+      }
+    }
+
     // Create full name
     const fullName = [
       validatedData.firstName,
@@ -87,12 +119,16 @@ export async function PUT(
       .join(' ')
 
     // Update student
+    const { section, enrollmentStatus, ...studentData } = validatedData
     const student = await prisma.student.update({
       where: { id },
       data: {
-        ...validatedData,
+        ...studentData,
+        lrn: normalizedLrn,
         fullName,
         dateOfBirth: new Date(validatedData.dateOfBirth),
+        sectionId: section || null,
+        ...(enrollmentStatus && { enrollmentStatus }),
       },
     })
 
@@ -104,9 +140,62 @@ export async function PUT(
       },
       data: {
         gradeLevel: validatedData.gradeLevel,
-        section: validatedData.section,
+        sectionId: section || null,
+        ...(enrollmentStatus && { status: enrollmentStatus }),
       },
     })
+
+    // Handle notification cleanup when status changes
+    if (enrollmentStatus && existingStudent.enrollmentStatus !== enrollmentStatus) {
+      const session = await auth()
+      const adminId = session?.user?.id || session?.user?.email || 'system'
+
+      // If changed from PENDING to ENROLLED, delete pending notifications
+      if (existingStudent.enrollmentStatus === 'PENDING' && enrollmentStatus === 'ENROLLED') {
+        await prisma.notification.deleteMany({
+          where: {
+            studentId: student.id,
+            type: 'ENROLLMENT',
+          },
+        })
+      }
+
+      // If changed to PENDING, create notification if it doesn't exist
+      if (enrollmentStatus === 'PENDING') {
+        const existingNotification = await prisma.notification.findFirst({
+          where: {
+            studentId: student.id,
+            type: 'ENROLLMENT',
+          },
+        })
+
+        if (!existingNotification) {
+          await prisma.notification.create({
+            data: {
+              adminId: adminId,
+              type: 'ENROLLMENT',
+              title: 'Pending Enrollment',
+              message: `${student.fullName} is enrolled in ${validatedData.gradeLevel} and is awaiting approval.`,
+              studentId: student.id,
+            },
+          })
+        }
+      }
+
+      // If changed to DROPPED, update notification message
+      if (enrollmentStatus === 'DROPPED') {
+        await prisma.notification.updateMany({
+          where: {
+            studentId: student.id,
+            type: 'ENROLLMENT',
+          },
+          data: {
+            title: 'Student Dropped',
+            message: `${student.fullName} has been dropped from ${validatedData.gradeLevel}.`,
+          },
+        })
+      }
+    }
 
     return NextResponse.json(student)
   } catch (error) {
@@ -185,6 +274,11 @@ export async function DELETE(
         { status: 403 }
       )
     }
+
+    // Delete related notifications
+    await prisma.notification.deleteMany({
+      where: { studentId: id },
+    })
 
     // Delete enrollments first
     await prisma.enrollment.deleteMany({

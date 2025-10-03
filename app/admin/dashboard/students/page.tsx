@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Table,
   TableBody,
@@ -39,18 +38,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Pencil, Trash2, Eye, History, GraduationCap, ArrowRightLeft } from 'lucide-react'
-import { toast } from 'sonner'
+import { Pencil, Trash2, Eye, ArrowRightLeft, Loader2, User, MapPin, Phone, GraduationCap, History, FileText } from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import { useRouter } from 'next/navigation'
+import { useStudentsStore } from '@/store/students-store'
+import { useStudents, useDeleteStudent, useSwitchStudent } from '@/hooks/use-students'
+import { useActiveAcademicYear } from '@/hooks/use-academic-years'
+import { useSections } from '@/hooks/use-sections'
+import { parseRemarks } from '@/lib/utils/format-remarks'
+import { STUDENT_REMARK_CATEGORIES } from '@/lib/constants/student-remarks'
 
 type Student = {
   id: string
   lrn: string | null
   fullName: string
   gradeLevel: string
-  section: string | null
+  section: {
+    id: string
+    name: string
+    gradeLevel: string
+  } | null
   contactNumber: string
   city: string
+  province: string
   enrollmentStatus: string
   isTransferee: boolean
   previousSchool: string | null
@@ -60,20 +71,32 @@ type Student = {
   subdivision: string | null
   barangay: string
   parentGuardian: string
+  remarks?: string | null
   enrollments: Array<{
     schoolYear: string
     gradeLevel: string
-    section: string | null
+    section: {
+      id: string
+      name: string
+      gradeLevel: string
+    } | null
     status: string
     enrollmentDate: string
   }>
 }
 
-type AcademicYear = {
-  id: string
-  name: string
-  isActive: boolean
+// Helper function to format full address
+function formatAddress(student: Student): string {
+  const parts = [
+    student.houseNumber,
+    student.street,
+    student.subdivision,
+    student.barangay,
+    student.city,
+    student.province,
+  ].filter(Boolean)
 
+  return parts.join(', ')
 }
 
 const GRADE_LEVELS = [
@@ -93,10 +116,7 @@ const GRADE_LEVELS = [
 ]
 
 export default function StudentsListPage() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [gradeFilter, setGradeFilter] = useState('All Grades')
-  const [statusFilter, setStatusFilter] = useState('All Status')
+  const router = useRouter()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null)
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false)
@@ -104,64 +124,61 @@ export default function StudentsListPage() {
   const [switchDialogOpen, setSwitchDialogOpen] = useState(false)
   const [newGradeLevel, setNewGradeLevel] = useState('')
   const [newSection, setNewSection] = useState('')
-  const queryClient = useQueryClient()
 
-  // Debounce search query - 500ms delay
+  // Zustand store - only for UI state
+  const { filters, setSearchQuery, setGradeLevel, setStatus, setRemark } = useStudentsStore()
+
+  // Generate remark options dynamically
+  const remarkOptions = useMemo(() => {
+    const allRemarks = STUDENT_REMARK_CATEGORIES.flatMap(category =>
+      category.remarks.map(remark => ({
+        value: remark,
+        label: remark,
+        category: category.label
+      }))
+    )
+    return [{ value: 'All Remarks', label: 'All Remarks', category: '' }, ...allRemarks]
+  }, [])
+
+  // React Query hooks
+  const { data: activeYear } = useActiveAcademicYear()
+
+  // Pass all filters to the API (server-side filtering)
+  const { data: students = [], isLoading } = useStudents({
+    searchQuery: filters.searchQuery,
+    gradeLevel: filters.gradeLevel,
+    status: filters.status,
+    remark: filters.remark,
+    academicYear: filters.academicYear,
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortOrder,
+  })
+
+  const deleteMutation = useDeleteStudent()
+  const switchMutation = useSwitchStudent()
+
+  // Fetch sections based on selected grade level
+  const { data: sections = [], isLoading: loadingSections } = useSections({
+    gradeLevel: newGradeLevel || '',
+    status: 'active',
+  })
+
+  // Clear section when grade level changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-    }, 500)
+    if (newGradeLevel) {
+      setNewSection('')
+    }
+  }, [newGradeLevel])
 
-    return () => clearTimeout(timer)
-  }, [searchQuery])
-
-  const { data: academicYears = [] } = useQuery<AcademicYear[]>({
-    queryKey: ['academic-years'],
-    queryFn: async () => {
-      const response = await fetch('/api/academic-years')
-      if (!response.ok) throw new Error('Failed to fetch')
-      return response.json()
-    },
-  })
-
-  // Get active academic year
-  const activeYear = academicYears.find((y) => y.isActive)
-
-  // Build query params
-  const queryParams = useMemo(() => {
-    const params = new URLSearchParams()
-    if (debouncedSearch) params.set('search', debouncedSearch)
-    if (gradeFilter && gradeFilter !== 'All Grades') params.set('gradeLevel', gradeFilter)
-    if (statusFilter && statusFilter !== 'All Status') params.set('status', statusFilter)
-    if (activeYear) params.set('academicYear', activeYear.name)
-    return params.toString()
-  }, [debouncedSearch, gradeFilter, statusFilter, activeYear])
-
-  const { data: students = [], isLoading } = useQuery<Student[]>({
-    queryKey: ['students', queryParams],
-    queryFn: async () => {
-      const response = await fetch(`/api/students?${queryParams}`)
-      if (!response.ok) throw new Error('Failed to fetch')
-      return response.json()
-    },
-    enabled: !!activeYear, // Only fetch when we have an active year
-  })
-
-  // Filter students by active year (server already filters by search/grade/status)
-  const filteredStudents = students.filter((student) => {
-    if (!activeYear) return false
-    return student.enrollments.some((e) => e.schoolYear === activeYear.name)
-  })
-
-  // Group students by grade level and section
-  const groupedStudents = filteredStudents.reduce((acc, student) => {
-    const key = `${student.gradeLevel}${student.section ? ` - ${student.section}` : ''}`
+  // Group students by grade level and section (already filtered by API)
+  const groupedStudents = students.reduce((acc, student) => {
+    const key = `${student.gradeLevel}${student.section ? ` - ${student.section.name}` : ''}`
     if (!acc[key]) {
       acc[key] = []
     }
     acc[key].push(student)
     return acc
-  }, {} as Record<string, typeof filteredStudents>)
+  }, {} as Record<string, Student[]>)
 
   // Sort the groups by grade level order
   const gradeOrder = [
@@ -180,30 +197,6 @@ export default function StudentsListPage() {
     return indexA - indexB
   })
 
-
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (studentId: string) => {
-      const response = await fetch(`/api/students/${studentId}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to delete student')
-      }
-      return response.json()
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['students'] })
-      toast.success('Student deleted successfully')
-      setDeleteDialogOpen(false)
-      setStudentToDelete(null)
-    },
-    onError: (error: Error) => {
-      toast.error(error.message)
-    },
-  })
-
   const handleDeleteClick = (student: Student) => {
     setStudentToDelete(student)
     setDeleteDialogOpen(true)
@@ -211,7 +204,12 @@ export default function StudentsListPage() {
 
   const handleDeleteConfirm = () => {
     if (studentToDelete) {
-      deleteMutation.mutate(studentToDelete.id)
+      deleteMutation.mutate(studentToDelete.id, {
+        onSuccess: () => {
+          setDeleteDialogOpen(false)
+          setStudentToDelete(null)
+        },
+      })
     }
   }
 
@@ -227,100 +225,77 @@ export default function StudentsListPage() {
     setSwitchDialogOpen(true)
   }
 
-  const switchMutation = useMutation({
-    mutationFn: async (data: { studentId: string; gradeLevel: string; section: string }) => {
-      const response = await fetch(`/api/students/${data.studentId}/switch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gradeLevel: data.gradeLevel,
-          section: data.section,
-        }),
-      })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to switch student')
-      }
-      return response.json()
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['students'] })
-      toast.success('Student switched successfully')
-      setSwitchDialogOpen(false)
-      setViewDetailsOpen(false)
-      setSelectedStudent(null)
-    },
-    onError: (error: Error) => {
-      toast.error(error.message)
-    },
-  })
-
   const handleSwitchConfirm = () => {
-    if (selectedStudent) {
-      switchMutation.mutate({
-        studentId: selectedStudent.id,
-        gradeLevel: newGradeLevel,
-        section: newSection,
-      })
+    if (selectedStudent && activeYear) {
+      switchMutation.mutate(
+        {
+          id: selectedStudent.id,
+          targetYearId: activeYear.id,
+          gradeLevel: newGradeLevel,
+          section: newSection,
+        },
+        {
+          onSuccess: () => {
+            setSwitchDialogOpen(false)
+            setSelectedStudent(null)
+          },
+        }
+      )
     }
   }
 
-  const canEditStudent = (student: Student) => {
-    if (!activeYear) return false
-    // Academic year is active
-    return student.enrollments.some(
-      (e) => e.schoolYear === activeYear.name
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { variant: any; className: string }> = {
+      ENROLLED: { variant: 'default', className: 'bg-green-100 text-green-700 border-green-300' },
+      PENDING: { variant: 'secondary', className: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+      DROPPED: { variant: 'destructive', className: 'bg-red-100 text-red-700 border-red-300' },
+    }
+    const config = variants[status] || variants.PENDING
+    return (
+      <Badge variant={config.variant} className={config.className}>
+        {status}
+      </Badge>
+    )
+  }
+
+  if (!activeYear) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-gray-500">No active academic year. Please create one first.</p>
+      </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">All Students - SY {activeYear?.name || 'N/A'}</h2>
-          <p className="text-gray-600 mt-1">
-            Viewing students enrolled in current academic year
-          </p>
-        </div>
-        <div>
-          <Button
-            variant="outline"
-            onClick={() => (window.location.href = '/admin/dashboard/students/archive')}
-          >
-            View Past Years
-          </Button>
-        </div>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Students</h2>
+        <p className="text-gray-600 mt-1">
+          Manage students for {activeYear.name}
+        </p>
       </div>
 
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Search & Filters</CardTitle>
+          <CardTitle>Filters</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
               <Label htmlFor="search">Search</Label>
-              <div className="relative">
-                <Input
-                  id="search"
-                  placeholder="Name, LRN, or City..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery !== debouncedSearch && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
-                  </div>
-                )}
-              </div>
+              <Input
+                id="search"
+                placeholder="Search by name, LRN, or city..."
+                value={filters.searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-
-            <div>
+            <div className="w-full md:w-48">
               <Label htmlFor="grade">Grade Level</Label>
-              <Select value={gradeFilter} onValueChange={setGradeFilter}>
+              <Select value={filters.gradeLevel} onValueChange={setGradeLevel}>
                 <SelectTrigger id="grade">
-                  <SelectValue placeholder="All grades" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {GRADE_LEVELS.map((grade) => (
@@ -331,19 +306,32 @@ export default function StudentsListPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            <div>
+            <div className="w-full md:w-48">
               <Label htmlFor="status">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={filters.status} onValueChange={setStatus}>
                 <SelectTrigger id="status">
-                  <SelectValue placeholder="All status" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="All Status">All Status</SelectItem>
                   <SelectItem value="ENROLLED">Enrolled</SelectItem>
                   <SelectItem value="PENDING">Pending</SelectItem>
-                  <SelectItem value="TRANSFERRED">Transferred</SelectItem>
                   <SelectItem value="DROPPED">Dropped</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full md:w-48">
+              <Label htmlFor="remark">Remarks</Label>
+              <Select value={filters.remark} onValueChange={setRemark}>
+                <SelectTrigger id="remark">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {remarkOptions.map((option, index) => (
+                    <SelectItem key={index} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -351,276 +339,399 @@ export default function StudentsListPage() {
         </CardContent>
       </Card>
 
-      {/* Results */}
-      <div className="space-y-6">
-        {isLoading ? (
-          <Card>
-            <CardContent className="py-8">
-              <p className="text-center">Loading...</p>
+      {/* Students List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+        </div>
+      ) : sortedGroups.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-gray-500">
+            No students found
+          </CardContent>
+        </Card>
+      ) : (
+        sortedGroups.map(([group, groupStudents]) => (
+          <Card key={group}>
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {group} ({groupStudents.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>LRN</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Gender</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead className="max-w-sm">Address</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groupStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-mono text-sm">
+                        {student.lrn || 'N/A'}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {student.fullName}
+                        {student.isTransferee && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            Transferee
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{student.gender}</TableCell>
+                      <TableCell>{student.contactNumber}</TableCell>
+                      <TableCell className="max-w-sm">
+                        <div className="break-words whitespace-normal">
+                          {formatAddress(student)}
+                        </div>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(student.enrollmentStatus)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleViewDetails(student)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => router.push(`/admin/dashboard/students/${student.id}/edit`)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSwitchClick(student)}
+                          >
+                            <ArrowRightLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteClick(student)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
-        ) : filteredStudents.length === 0 ? (
-          <Card>
-            <CardContent className="py-8">
-              <p className="text-center text-gray-500">
-                {searchQuery || gradeFilter !== 'All Grades' || statusFilter !== 'All Status'
-                  ? 'No students match your search criteria'
-                  : 'No students enrolled yet'}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          sortedGroups.map(([groupKey, groupStudents]) => (
-            <Card key={groupKey} className="border-2">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b-2">
-                <CardTitle className="flex items-center justify-between">
-                  <span className="text-lg font-bold text-gray-900">{groupKey}</span>
-                  <span className="text-sm font-normal text-gray-600">
-                    {groupStudents.length} {groupStudents.length === 1 ? 'student' : 'students'}
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50">
-                        <TableHead className="font-semibold">LRN</TableHead>
-                        <TableHead className="font-semibold">Name</TableHead>
-                        <TableHead className="font-semibold">Gender</TableHead>
-                        <TableHead className="font-semibold">Contact</TableHead>
-                        <TableHead className="font-semibold">Address</TableHead>
-                        <TableHead className="font-semibold">Parent/Guardian</TableHead>
-                        <TableHead className="font-semibold">Status</TableHead>
-                        <TableHead className="text-right font-semibold">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {groupStudents.map((student, index) => (
-                        <TableRow key={student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <TableCell className="font-mono text-sm">
-                            {student.lrn || 'N/A'}
-                          </TableCell>
-                          <TableCell className="font-medium">{student.fullName}</TableCell>
-                          <TableCell className="text-sm">{student.gender}</TableCell>
-                          <TableCell className="text-sm">
-                            {student.contactNumber}
-                          </TableCell>
-                          <TableCell className="text-sm max-w-xs">
-                            <div className="truncate">
-                              {[student.houseNumber, student.street, student.subdivision, student.barangay, student.city]
-                                .filter(Boolean)
-                                .join(', ')}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm">{student.parentGuardian}</TableCell>
-                          <TableCell>
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                student.enrollmentStatus === 'ENROLLED'
-                                  ? 'bg-green-100 text-green-800'
-                                  : student.enrollmentStatus === 'PENDING'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
-                              {student.enrollmentStatus}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewDetails(student)}
-                                title="View Details & History"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleSwitchClick(student)}
-                                title="Switch Section/Grade"
-                              >
-                                <ArrowRightLeft className="h-4 w-4 text-blue-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => window.location.href = `/admin/dashboard/students/${student.id}/edit`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteClick(student)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-600" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+        ))
+      )}
 
-      {/* Student Details & Enrollment History Dialog */}
+      {/* View Details Dialog */}
       <Dialog open={viewDetailsOpen} onOpenChange={setViewDetailsOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[1600px] w-full max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <User className="h-5 w-5" />
               Student Details
             </DialogTitle>
+            <DialogDescription>
+              Complete information and enrollment history
+            </DialogDescription>
           </DialogHeader>
-
           {selectedStudent && (
             <div className="space-y-6">
               {/* Personal Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Personal Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <Label className="text-sm text-muted-foreground">Full Name</Label>
-                      <p className="text-sm font-medium">{selectedStudent.fullName}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-sm text-muted-foreground">LRN</Label>
-                      <p className="text-sm font-medium font-mono">{selectedStudent.lrn || 'N/A'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-sm text-muted-foreground">Gender</Label>
-                      <p className="text-sm font-medium">{selectedStudent.gender}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-sm text-muted-foreground">Contact Number</Label>
-                      <p className="text-sm font-medium">{selectedStudent.contactNumber}</p>
-                    </div>
-                    <div className="space-y-1 md:col-span-2">
-                      <Label className="text-sm text-muted-foreground">Address</Label>
-                      <p className="text-sm font-medium">
-                        {[selectedStudent.houseNumber, selectedStudent.street, selectedStudent.subdivision, selectedStudent.barangay, selectedStudent.city]
-                          .filter(Boolean)
-                          .join(', ')}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-sm text-muted-foreground">Parent/Guardian</Label>
-                      <p className="text-sm font-medium">{selectedStudent.parentGuardian}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-sm text-muted-foreground">Current Status</Label>
-                      <Badge
-                        variant={
-                          selectedStudent.enrollmentStatus === 'ENROLLED'
-                            ? 'success'
-                            : selectedStudent.enrollmentStatus === 'PENDING'
-                            ? 'warning'
-                            : 'outline'
-                        }
-                      >
-                        {selectedStudent.enrollmentStatus}
-                      </Badge>
-                    </div>
-                    {selectedStudent.isTransferee && (
-                      <div className="space-y-1 md:col-span-3">
-                        <Label className="text-sm text-muted-foreground">Previous School</Label>
-                        <p className="text-sm font-medium">{selectedStudent.previousSchool}</p>
-                      </div>
-                    )}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <User className="h-4 w-4" />
+                  <span>Personal Information</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 pl-6">
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Full Name</p>
+                    <p className="text-sm font-medium">{selectedStudent.fullName}</p>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">LRN</p>
+                    <p className="text-sm font-medium font-mono">{selectedStudent.lrn || 'N/A'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Gender</p>
+                    <p className="text-sm font-medium">{selectedStudent.gender}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Status</p>
+                    {getStatusBadge(selectedStudent.enrollmentStatus)}
+                  </div>
+                </div>
+              </div>
 
-              {/* Enrollment History */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <History className="h-5 w-5" />
-                    Enrollment History
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {selectedStudent.enrollments.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">No enrollment history</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {selectedStudent.enrollments
-                        .sort((a, b) => new Date(b.enrollmentDate).getTime() - new Date(a.enrollmentDate).getTime())
-                        .map((enrollment, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start gap-4 p-4 rounded-lg border hover:bg-accent transition-colors"
-                        >
-                          <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg font-bold text-primary">
-                              {enrollment.schoolYear.split('-')[0].slice(-2)}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <h4 className="text-sm font-semibold">{enrollment.schoolYear}</h4>
-                              <Badge
-                                variant={
-                                  enrollment.status === 'ENROLLED'
-                                    ? 'success'
-                                    : enrollment.status === 'PENDING'
-                                    ? 'warning'
-                                    : 'outline'
-                                }
-                              >
-                                {enrollment.status}
-                              </Badge>
-                            </div>
-                            <div className="space-y-0.5 text-sm text-muted-foreground">
-                              <p>
-                                <span className="font-medium">Grade Level:</span> {enrollment.gradeLevel}
-                                {enrollment.section && ` - ${enrollment.section}`}
-                              </p>
-                              <p>
-                                <span className="font-medium">Enrolled:</span>{' '}
-                                {new Date(enrollment.enrollmentDate).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric'
-                                })}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+              <Separator />
 
-                      {!selectedStudent.isTransferee && selectedStudent.enrollments.length > 0 && (
-                        <div className="flex items-start gap-3 p-4 rounded-lg bg-muted mt-4">
-                          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <GraduationCap className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold">
-                              Total Years at School: {selectedStudent.enrollments.length}
-                            </p>
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                              Enrolled since {selectedStudent.enrollments[selectedStudent.enrollments.length - 1]?.schoolYear}
-                            </p>
-                          </div>
-                        </div>
-                      )}
+              {/* Contact Information */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <Phone className="h-4 w-4" />
+                  <span>Contact Information</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 pl-6">
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Contact Number</p>
+                    <p className="text-sm font-medium">{selectedStudent.contactNumber}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Parent/Guardian</p>
+                    <p className="text-sm font-medium">{selectedStudent.parentGuardian}</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Address */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <MapPin className="h-4 w-4" />
+                  <span>Address</span>
+                </div>
+                <div className="pl-6">
+                  <p className="text-sm font-medium leading-relaxed">
+                    {[
+                      selectedStudent.houseNumber && `Lot ${selectedStudent.houseNumber}`,
+                      selectedStudent.street,
+                      selectedStudent.subdivision,
+                      selectedStudent.barangay,
+                      selectedStudent.city,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Current Enrollment */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <GraduationCap className="h-4 w-4" />
+                  <span>Current Enrollment</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 pl-6">
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Grade Level</p>
+                    <p className="text-sm font-medium">{selectedStudent.gradeLevel}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Section</p>
+                    <p className="text-sm font-medium">
+                      {selectedStudent.section?.name || 'Not Assigned'}
+                    </p>
+                  </div>
+                  {selectedStudent.isTransferee && (
+                    <div className="col-span-2 space-y-1">
+                      <p className="text-xs text-gray-500">Previous School</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">Transferee</Badge>
+                        <p className="text-sm font-medium">
+                          {selectedStudent.previousSchool || 'N/A'}
+                        </p>
+                      </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
+
+              {/* Remarks */}
+              {selectedStudent.remarks && (() => {
+                const { customText, checkboxValues } = parseRemarks(selectedStudent.remarks)
+                const hasRemarks = customText || checkboxValues.length > 0
+
+                if (!hasRemarks) return null
+
+                return (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <FileText className="h-4 w-4" />
+                        <span>Remarks</span>
+                      </div>
+                      <div className="pl-6 space-y-3">
+                        {customText && (
+                          <div>
+                            <p className="text-sm">
+                              <span className="font-bold">(Admin NOTE: {customText})</span>
+                            </p>
+                          </div>
+                        )}
+                        {checkboxValues.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground">Other Remarks:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {checkboxValues.map((remark, index) => (
+                                <Badge key={index} variant="secondary" className="text-xs">
+                                  {remark}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
+
+              {/* Enrollment History */}
+              {selectedStudent.enrollments && selectedStudent.enrollments.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <History className="h-4 w-4" />
+                      <span>Enrollment History</span>
+                    </div>
+                    <div className="pl-6 space-y-2">
+                      {selectedStudent.enrollments
+                        .sort((a, b) => new Date(b.enrollmentDate).getTime() - new Date(a.enrollmentDate).getTime())
+                        .map((enrollment, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium">SY {enrollment.schoolYear}</p>
+                                <span className="text-gray-300">•</span>
+                                <p className="text-sm text-gray-600">{enrollment.gradeLevel}</p>
+                                {enrollment.section && (
+                                  <>
+                                    <span className="text-gray-300">•</span>
+                                    <p className="text-sm text-gray-600">{enrollment.section.name}</p>
+                                  </>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Enrolled: {new Date(enrollment.enrollmentDate).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={
+                                enrollment.status === 'ENROLLED'
+                                  ? 'bg-green-50 text-green-700 border-green-300'
+                                  : enrollment.status === 'PENDING'
+                                  ? 'bg-yellow-50 text-yellow-700 border-yellow-300'
+                                  : 'bg-gray-50 text-gray-700 border-gray-300'
+                              }
+                            >
+                              {enrollment.status}
+                            </Badge>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDetailsOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setViewDetailsOpen(false)
+              if (selectedStudent) {
+                router.push(`/admin/dashboard/students/${selectedStudent.id}/edit`)
+              }
+            }}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit Student
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Switch Grade/Section Dialog */}
+      <Dialog open={switchDialogOpen} onOpenChange={setSwitchDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Switch Grade/Section</DialogTitle>
+            <DialogDescription>
+              Update student&apos;s grade level and section
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="newGrade">Grade Level</Label>
+              <Select value={newGradeLevel} onValueChange={setNewGradeLevel}>
+                <SelectTrigger id="newGrade">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GRADE_LEVELS.filter((g) => g !== 'All Grades').map((grade) => (
+                    <SelectItem key={grade} value={grade}>
+                      {grade}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="newSection">Section</Label>
+              <Select
+                value={newSection}
+                onValueChange={setNewSection}
+                disabled={!newGradeLevel || loadingSections}
+              >
+                <SelectTrigger id="newSection">
+                  <SelectValue
+                    placeholder={
+                      !newGradeLevel
+                        ? "Select grade level first"
+                        : loadingSections
+                        ? "Loading sections..."
+                        : sections.length === 0
+                        ? "No sections available"
+                        : "Select section"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {sections.map((section: any) => (
+                    <SelectItem key={section.id} value={section.id}>
+                      {section.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSwitchDialogOpen(false)}
+              disabled={switchMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSwitchConfirm}
+              disabled={switchMutation.isPending}
+            >
+              {switchMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Switch
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -630,75 +741,22 @@ export default function StudentsListPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete {studentToDelete?.fullName} and all their enrollment records.
-              This action cannot be undone.
+              This will permanently delete {studentToDelete?.fullName}. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
-              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Switch Section/Grade Dialog */}
-      <Dialog open={switchDialogOpen} onOpenChange={setSwitchDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Switch Student Section/Grade</DialogTitle>
-            <DialogDescription>
-              Update {selectedStudent?.fullName}&apos;s grade level and section
-            </DialogDescription>
-          </DialogHeader>
-          {selectedStudent && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="currentInfo" className="text-sm text-muted-foreground">
-                  Current: {selectedStudent.gradeLevel}
-                  {selectedStudent.section && ` - ${selectedStudent.section}`}
-                </Label>
-              </div>
-              <div>
-                <Label htmlFor="newGradeLevel">Grade Level *</Label>
-                <Select value={newGradeLevel} onValueChange={setNewGradeLevel}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select grade level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {GRADE_LEVELS.filter((g) => g !== 'All Grades').map((grade) => (
-                      <SelectItem key={grade} value={grade}>
-                        {grade}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="newSection">Section</Label>
-                <Input
-                  id="newSection"
-                  value={newSection}
-                  onChange={(e) => setNewSection(e.target.value)}
-                  placeholder="e.g., Enthusiasm, Obedience"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSwitchDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSwitchConfirm} disabled={switchMutation.isPending}>
-              {switchMutation.isPending ? 'Switching...' : 'Switch Student'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

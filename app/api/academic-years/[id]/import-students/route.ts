@@ -90,7 +90,7 @@ export async function POST(
                 academicYearId: targetAcademicYearId,
                 schoolYear: targetYear.name,
                 gradeLevel: importStudent.gradeLevel,
-                section: null, // Section will be assigned later
+                sectionId: null, // Section will be assigned later
                 status: 'ENROLLED',
               },
             })
@@ -100,7 +100,7 @@ export async function POST(
               where: { id: student.id },
               data: {
                 gradeLevel: importStudent.gradeLevel,
-                section: null,
+                sectionId: null,
                 enrollmentStatus: 'ENROLLED',
               },
             })

@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -20,14 +21,29 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { FileText, Download, Printer } from 'lucide-react'
+import { FileText, Download, Printer, Users, TrendingUp, UserCheck, UserX } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+} from 'recharts'
 
 type AcademicYear = {
   id: string
   name: string
   isActive: boolean
-
 }
 
 type ReportData = {
@@ -54,6 +70,18 @@ type ReportData = {
     enrollmentStatus: string
   }>
 }
+
+// Chart colors
+const COLORS = {
+  primary: '#3b82f6',
+  success: '#10b981',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  male: '#3b82f6',
+  female: '#ec4899',
+}
+
+const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
 
 export default function ReportsPage() {
   const [selectedYearId, setSelectedYearId] = useState<string>('')
@@ -118,21 +146,43 @@ export default function ReportsPage() {
     toast.success('Report exported successfully!')
   }
 
+  // Prepare enrollment status data for pie chart
+  const enrollmentStatusData = reportData
+    ? [
+        { name: 'Enrolled', value: reportData.enrolledStudents },
+        { name: 'Pending', value: reportData.pendingStudents },
+      ]
+    : []
+
+  // Prepare gender distribution data
+  const genderData = reportData
+    ? [
+        {
+          name: 'Male',
+          value: reportData.gradeDistribution.reduce((sum, g) => sum + g.male, 0),
+        },
+        {
+          name: 'Female',
+          value: reportData.gradeDistribution.reduce((sum, g) => sum + g.female, 0),
+        },
+      ]
+    : []
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Enrollment Reports</h2>
-          <p className="text-gray-600 mt-1">
-            Generate comprehensive reports for any academic year
+          <h2 className="text-3xl font-bold tracking-tight">Enrollment Reports</h2>
+          <p className="text-muted-foreground">
+            Comprehensive analytics and reports for academic year enrollments
           </p>
         </div>
         <div className="flex gap-2 print:hidden">
-          <Button onClick={handlePrint} variant="outline">
+          <Button onClick={handlePrint} variant="outline" size="sm">
             <Printer className="h-4 w-4 mr-2" />
             Print
           </Button>
-          <Button onClick={handleExportCSV} disabled={!reportData}>
+          <Button onClick={handleExportCSV} disabled={!reportData} size="sm">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
@@ -178,78 +228,195 @@ export default function ReportsPage() {
 
       {isLoading ? (
         <Card>
-          <CardContent className="py-8">
-            <p className="text-center text-gray-500">Loading report...</p>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+              <p className="text-sm text-muted-foreground">Loading report...</p>
+            </div>
           </CardContent>
         </Card>
       ) : reportData ? (
         <>
           {/* Report Header */}
-          <Card>
+          <Card className="border-none bg-gradient-to-r from-blue-600 to-indigo-700">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-white">
                 <FileText className="h-5 w-5" />
                 Enrollment Report - SY {reportData.academicYear}
               </CardTitle>
+              <CardDescription className="text-blue-100">
+                Generated on {new Date().toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </CardDescription>
             </CardHeader>
           </Card>
 
           {/* Summary Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Total Students
-                </CardTitle>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border-l-4 border-l-blue-500">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Students
+                  </CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-gray-900">
+                <div className="text-2xl font-bold">
                   {reportData.totalStudents}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">All enrolled students</p>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Enrolled
-                </CardTitle>
+            <Card className="border-l-4 border-l-green-500">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Enrolled
+                  </CardTitle>
+                  <UserCheck className="h-4 w-4 text-muted-foreground" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-green-600">
+                <div className="text-2xl font-bold text-green-600">
                   {reportData.enrolledStudents}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {reportData.totalStudents > 0
+                    ? Math.round((reportData.enrolledStudents / reportData.totalStudents) * 100)
+                    : 0}% of total
+                </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Pending
-                </CardTitle>
+            <Card className="border-l-4 border-l-yellow-500">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Pending
+                  </CardTitle>
+                  <UserX className="h-4 w-4 text-muted-foreground" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-yellow-600">
+                <div className="text-2xl font-bold text-yellow-600">
                   {reportData.pendingStudents}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {reportData.totalStudents > 0
+                    ? Math.round((reportData.pendingStudents / reportData.totalStudents) * 100)
+                    : 0}% of total
+                </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Transferees
-                </CardTitle>
+            <Card className="border-l-4 border-l-purple-500">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Transferees
+                  </CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-blue-600">
+                <div className="text-2xl font-bold text-purple-600">
                   {reportData.transferees}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {reportData.totalStudents > 0
+                    ? Math.round((reportData.transferees / reportData.totalStudents) * 100)
+                    : 0}% of total
+                </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Grade Distribution */}
+          {/* Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Enrollment Status Pie Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Enrollment Status Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={enrollmentStatusData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      <Cell fill={COLORS.success} />
+                      <Cell fill={COLORS.warning} />
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Gender Distribution Pie Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Gender Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={genderData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      <Cell fill={COLORS.male} />
+                      <Cell fill={COLORS.female} />
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Grade Distribution Bar Chart */}
           <Card>
             <CardHeader>
-              <CardTitle>Distribution by Grade Level</CardTitle>
+              <CardTitle className="text-lg">Students by Grade Level</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={reportData.gradeDistribution}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="gradeLevel" angle={-45} textAnchor="end" height={100} />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="male" fill={COLORS.male} name="Male" />
+                  <Bar dataKey="female" fill={COLORS.female} name="Female" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Grade Distribution Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Detailed Grade Level Distribution</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -259,6 +426,7 @@ export default function ReportsPage() {
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-right">Male</TableHead>
                     <TableHead className="text-right">Female</TableHead>
+                    <TableHead className="text-right">% of Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -268,21 +436,39 @@ export default function ReportsPage() {
                       <TableCell className="text-right font-semibold">
                         {grade.count}
                       </TableCell>
-                      <TableCell className="text-right">{grade.male}</TableCell>
-                      <TableCell className="text-right">{grade.female}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                          {grade.male}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="outline" className="border-pink-200 bg-pink-50 text-pink-700">
+                          {grade.female}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {reportData.totalStudents > 0
+                          ? ((grade.count / reportData.totalStudents) * 100).toFixed(1)
+                          : 0}%
+                      </TableCell>
                     </TableRow>
                   ))}
-                  <TableRow className="bg-gray-50 font-semibold">
+                  <TableRow className="bg-muted/50 font-semibold border-t-2">
                     <TableCell>Total</TableCell>
                     <TableCell className="text-right">
                       {reportData.gradeDistribution.reduce((sum, g) => sum + g.count, 0)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {reportData.gradeDistribution.reduce((sum, g) => sum + g.male, 0)}
+                      <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                        {reportData.gradeDistribution.reduce((sum, g) => sum + g.male, 0)}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {reportData.gradeDistribution.reduce((sum, g) => sum + g.female, 0)}
+                      <Badge variant="outline" className="border-pink-200 bg-pink-50 text-pink-700">
+                        {reportData.gradeDistribution.reduce((sum, g) => sum + g.female, 0)}
+                      </Badge>
                     </TableCell>
+                    <TableCell className="text-right">100%</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -292,7 +478,7 @@ export default function ReportsPage() {
           {/* Student List */}
           <Card>
             <CardHeader>
-              <CardTitle>Complete Student List</CardTitle>
+              <CardTitle>Complete Student List ({reportData.students.length} students)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -315,24 +501,35 @@ export default function ReportsPage() {
                           {student.lrn || 'N/A'}
                         </TableCell>
                         <TableCell className="font-medium">{student.fullName}</TableCell>
-                        <TableCell>{student.gender}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn(
+                            student.gender === 'Male' && 'border-blue-200 bg-blue-50 text-blue-700',
+                            student.gender === 'Female' && 'border-pink-200 bg-pink-50 text-pink-700'
+                          )}>
+                            {student.gender}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{student.gradeLevel}</TableCell>
                         <TableCell>{student.section || 'N/A'}</TableCell>
                         <TableCell className="text-sm">
                           {student.barangay}, {student.city}
                         </TableCell>
                         <TableCell>
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          <Badge
+                            variant={
                               student.enrollmentStatus === 'ENROLLED'
-                                ? 'bg-green-100 text-green-800'
+                                ? 'default'
                                 : student.enrollmentStatus === 'PENDING'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
+                                ? 'secondary'
+                                : 'outline'
+                            }
+                            className={cn(
+                              student.enrollmentStatus === 'ENROLLED' && 'bg-green-100 text-green-800 hover:bg-green-100',
+                              student.enrollmentStatus === 'PENDING' && 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+                            )}
                           >
                             {student.enrollmentStatus}
-                          </span>
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -344,8 +541,11 @@ export default function ReportsPage() {
         </>
       ) : (
         <Card>
-          <CardContent className="py-8">
-            <p className="text-center text-gray-500">Select an academic year to generate report</p>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <FileText className="h-12 w-12 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">Select an academic year to generate report</p>
+            </div>
           </CardContent>
         </Card>
       )}

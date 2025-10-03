@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
 
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -15,18 +15,18 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') // 'ENROLLMENT', 'SYSTEM', 'ALERT', or null for all
-    const isRead = searchParams.get('isRead') // 'true', 'false', or null for all
+    const read = searchParams.get('read') // 'true', 'false', or null for all
 
-    const where: any = {
-      adminId: session.user.id,
-    }
+    const where: any = {}
 
-    if (type) {
+    if (type && type !== 'all') {
       where.type = type
     }
 
-    if (isRead !== null) {
-      where.isRead = isRead === 'true'
+    if (read === 'true') {
+      where.isRead = true
+    } else if (read === 'false') {
+      where.isRead = false
     }
 
     const notifications = await prisma.notification.findMany({

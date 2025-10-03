@@ -4,7 +4,9 @@ import { setActiveAcademicYear } from '@/lib/academic-year'
 import { z } from 'zod'
 
 const updateSchema = z.object({
-  endDate: z.string().optional(),
+  name: z.string().min(1).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
 })
 
@@ -61,13 +63,34 @@ export async function PATCH(
     const validatedData = updateSchema.parse(body)
 
     const data: any = {}
-    if (validatedData.endDate) {
-      data.endDate = new Date(validatedData.endDate)
+
+    // Update name if provided
+    if (validatedData.name) {
+      data.name = validatedData.name
+    }
+
+    // Update startDate if provided
+    if (validatedData.startDate) {
+      data.startDate = new Date(validatedData.startDate)
+    }
+
+    // Update endDate if provided (can be null)
+    if (validatedData.endDate !== undefined) {
+      data.endDate = validatedData.endDate ? new Date(validatedData.endDate) : null
     }
 
     // If setting to active, use the utility function to ensure only one active year
     if (validatedData.isActive === true) {
       await setActiveAcademicYear(id)
+
+      // Apply other updates if any
+      if (Object.keys(data).length > 0) {
+        await prisma.academicYear.update({
+          where: { id },
+          data,
+        })
+      }
+
       const academicYear = await prisma.academicYear.findUnique({
         where: { id },
       })

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,25 +30,31 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { toast } from 'sonner'
-import { Pencil, Upload } from 'lucide-react'
+import { Pencil, Upload, Loader2 } from 'lucide-react'
 import { BulkImportStudentsDialog } from '@/components/bulk-import-students-dialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { useAcademicYearsStore } from '@/store/academic-years-store'
+import {
+  useAcademicYears,
+  useActiveAcademicYear,
+  useCreateAcademicYear,
+  useUpdateAcademicYear,
+  useDeleteAcademicYear,
+  useActivateAcademicYear,
+} from '@/hooks/use-academic-years'
 
 type AcademicYear = {
   id: string
   name: string
-  startDate: string
-  endDate: string | null
+  startDate: Date
+  endDate: Date | null
   isActive: boolean
-
-  _count: {
+  _count?: {
     enrollments: number
   }
 }
 
 export default function AcademicYearsPage() {
-  const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -57,7 +62,6 @@ export default function AcademicYearsPage() {
   const [showForm, setShowForm] = useState(false)
   const [showCreateConfirm, setShowCreateConfirm] = useState(false)
   const [showSwitchConfirm, setShowSwitchConfirm] = useState(false)
-  const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showImportDialog, setShowImportDialog] = useState(false)
@@ -75,91 +79,16 @@ export default function AcademicYearsPage() {
     endDate: string
   } | null>(null)
 
-  const { data: academicYears = [], isLoading } = useQuery<AcademicYear[]>({
-    queryKey: ['academic-years'],
-    queryFn: async () => {
-      const response = await fetch('/api/academic-years')
-      if (!response.ok) throw new Error('Failed to fetch')
-      return response.json()
-    },
-  })
+  // Zustand store
+  const { filters } = useAcademicYearsStore()
 
-  const createMutation = useMutation({
-    mutationFn: async (data: { name: string; startDate: string; endDate?: string }) => {
-      const response = await fetch('/api/academic-years', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      if (!response.ok) throw new Error('Failed to create')
-      return response.json()
-    },
-    onSuccess: (newYear) => {
-      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
-      setName('')
-      setStartDate('')
-      setEndDate('')
-      setShowForm(false)
-      setPendingCreateData(null)
-      toast.success('Academic year created successfully!')
-
-      // If import checkbox was checked, open import dialog
-      if (importPreviousStudents) {
-        setImportTargetYear(newYear)
-        setShowImportDialog(true)
-        setImportPreviousStudents(false)
-      }
-    },
-  })
-
-  const switchYearMutation = useMutation({
-    mutationFn: async (yearId: string) => {
-      const response = await fetch(`/api/academic-years/${yearId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'activate' }),
-      })
-      if (!response.ok) throw new Error('Failed to switch year')
-      return response.json()
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
-      toast.success('Academic year switched successfully!')
-    },
-  })
-
-  const endYearMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/academic-years/${id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'end' }),
-      })
-      if (!response.ok) throw new Error('Failed to end year')
-      return response.json()
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
-      toast.success('Academic year ended successfully!', {
-        description: 'The academic year has been closed.',
-      })
-    },
-  })
-
-  const updateEndDateMutation = useMutation({
-    mutationFn: async ({ id, endDate }: { id: string; endDate: string }) => {
-      const response = await fetch(`/api/academic-years/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endDate }),
-      })
-      if (!response.ok) throw new Error('Failed to update')
-      return response.json()
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
-    },
-  })
+  // React Query hooks
+  const { data: academicYears = [], isLoading } = useAcademicYears(filters)
+  const { data: activeYear } = useActiveAcademicYear()
+  const createMutation = useCreateAcademicYear()
+  const updateMutation = useUpdateAcademicYear()
+  const deleteMutation = useDeleteAcademicYear()
+  const activateMutation = useActivateAcademicYear()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -170,19 +99,48 @@ export default function AcademicYearsPage() {
     }
 
     // Check if there's already an active year
-    const activeYear = academicYears.find((y) => y.isActive)
     if (activeYear) {
       setPendingCreateData(data)
       setShowCreateConfirm(true)
     } else {
-      createMutation.mutate(data)
+      createMutation.mutate(data, {
+        onSuccess: (newYear) => {
+          setName('')
+          setStartDate('')
+          setEndDate('')
+          setShowForm(false)
+          setPendingCreateData(null)
+
+          // If import checkbox was checked, open import dialog
+          if (importPreviousStudents) {
+            setImportTargetYear(newYear)
+            setShowImportDialog(true)
+            setImportPreviousStudents(false)
+          }
+        },
+      })
     }
   }
 
   const handleConfirmCreate = () => {
     if (pendingCreateData) {
-      createMutation.mutate(pendingCreateData)
-      setShowCreateConfirm(false)
+      createMutation.mutate(pendingCreateData, {
+        onSuccess: (newYear) => {
+          setName('')
+          setStartDate('')
+          setEndDate('')
+          setShowForm(false)
+          setShowCreateConfirm(false)
+          setPendingCreateData(null)
+
+          // If import checkbox was checked, open import dialog
+          if (importPreviousStudents) {
+            setImportTargetYear(newYear)
+            setShowImportDialog(true)
+            setImportPreviousStudents(false)
+          }
+        },
+      })
     }
   }
 
@@ -193,43 +151,14 @@ export default function AcademicYearsPage() {
 
   const handleConfirmSwitch = () => {
     if (pendingActionYear) {
-      switchYearMutation.mutate(pendingActionYear.id)
-      setShowSwitchConfirm(false)
-      setPendingActionYear(null)
+      activateMutation.mutate(pendingActionYear.id, {
+        onSuccess: () => {
+          setShowSwitchConfirm(false)
+          setPendingActionYear(null)
+        },
+      })
     }
   }
-
-  const handleEndYear = (year: AcademicYear) => {
-    setPendingActionYear(year)
-    setShowEndConfirm(true)
-  }
-
-  const handleConfirmEnd = () => {
-    if (pendingActionYear) {
-      endYearMutation.mutate(pendingActionYear.id)
-      setShowEndConfirm(false)
-      setPendingActionYear(null)
-    }
-  }
-
-  const deleteYearMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/academic-years/${id}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) throw new Error('Failed to delete academic year')
-      return response.json()
-    },
-    onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
-      toast.success('Academic year deleted successfully!', {
-        description: `Deleted ${data.deletedYear} with ${data.deletedEnrollments} enrollments`,
-      })
-    },
-    onError: () => {
-      toast.error('Failed to delete academic year')
-    },
-  })
 
   const handleDeleteYear = (year: AcademicYear) => {
     setPendingActionYear(year)
@@ -238,9 +167,12 @@ export default function AcademicYearsPage() {
 
   const handleConfirmDelete = () => {
     if (pendingActionYear) {
-      deleteYearMutation.mutate(pendingActionYear.id)
-      setShowDeleteConfirm(false)
-      setPendingActionYear(null)
+      deleteMutation.mutate(pendingActionYear.id, {
+        onSuccess: () => {
+          setShowDeleteConfirm(false)
+          setPendingActionYear(null)
+        },
+      })
     }
   }
 
@@ -254,43 +186,33 @@ export default function AcademicYearsPage() {
     setShowEditDialog(true)
   }
 
-  const editYearMutation = useMutation({
-    mutationFn: async (data: { id: string; name: string; startDate: string; endDate?: string }) => {
-      const response = await fetch(`/api/academic-years/${data.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: data.name,
-          startDate: data.startDate,
-          endDate: data.endDate || null,
-        }),
-      })
-      if (!response.ok) throw new Error('Failed to update academic year')
-      return response.json()
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
-      toast.success('Academic year updated successfully!')
-      setShowEditDialog(false)
-      setEditData(null)
-    },
-    onError: () => {
-      toast.error('Failed to update academic year')
-    },
-  })
-
   const handleSaveEdit = () => {
     if (editData) {
-      editYearMutation.mutate({
-        id: editData.id,
-        name: editData.name,
-        startDate: editData.startDate,
-        endDate: editData.endDate || undefined,
-      })
+      updateMutation.mutate(
+        {
+          id: editData.id,
+          data: {
+            name: editData.name,
+            startDate: editData.startDate,
+            endDate: editData.endDate || null,
+          },
+        },
+        {
+          onSuccess: () => {
+            setShowEditDialog(false)
+            setEditData(null)
+          },
+        }
+      )
     }
   }
 
-  const activeYear = academicYears.find((y) => y.isActive)
+  const handleUpdateEndDate = (id: string, endDate: string) => {
+    updateMutation.mutate({
+      id,
+      data: { endDate },
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -374,6 +296,7 @@ export default function AcademicYearsPage() {
               )}
 
               <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {createMutation.isPending ? 'Creating...' : 'Create Academic Year'}
               </Button>
             </form>
@@ -400,8 +323,8 @@ export default function AcademicYearsPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
-                    Loading...
+                  <TableCell colSpan={6} className="text-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" />
                   </TableCell>
                 </TableRow>
               ) : academicYears.length === 0 ? (
@@ -425,10 +348,7 @@ export default function AcademicYearsPage() {
                           type="date"
                           className="border rounded px-2 py-1 text-sm"
                           onChange={(e) =>
-                            updateEndDateMutation.mutate({
-                              id: year.id,
-                              endDate: e.target.value,
-                            })
+                            handleUpdateEndDate(year.id, e.target.value)
                           }
                           placeholder="Set end date"
                         />
@@ -437,64 +357,49 @@ export default function AcademicYearsPage() {
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         {year.isActive && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border-green-300">
                             Active
                           </span>
                         )}
-                        {false && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            Closed
-                          </span>
-                        )}
                         {!year.isActive && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 border-yellow-300">
                             Inactive
                           </span>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{year._count.enrollments}</TableCell>
+                    <TableCell>{year._count?.enrollments || 0}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditYear(year)}
-                          disabled={editYearMutation.isPending}
+                          disabled={updateMutation.isPending}
                         >
                           <Pencil className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
                         {year.isActive && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setImportTargetYear(year)
-                                setShowImportDialog(true)
-                              }}
-                              className="border-blue-500 text-blue-700 hover:bg-blue-50"
-                            >
-                              <Upload className="h-4 w-4 mr-1" />
-                              Import Students
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleEndYear(year)}
-                              disabled={endYearMutation.isPending}
-                            >
-                              End Year
-                            </Button>
-                          </>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setImportTargetYear(year)
+                              setShowImportDialog(true)
+                            }}
+                            className="border-blue-500 text-blue-700 hover:bg-blue-50"
+                          >
+                            <Upload className="h-4 w-4 mr-1" />
+                            Import Students
+                          </Button>
                         )}
                         {!year.isActive && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleSwitchYear(year)}
-                            disabled={switchYearMutation.isPending}
+                            disabled={activateMutation.isPending}
                             className="border-green-500 text-green-700 hover:bg-green-50"
                           >
                             Activate
@@ -504,7 +409,7 @@ export default function AcademicYearsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleDeleteYear(year)}
-                          disabled={deleteYearMutation.isPending}
+                          disabled={deleteMutation.isPending}
                           className="border-red-500 text-red-700 hover:bg-red-50"
                         >
                           Delete
@@ -539,7 +444,7 @@ export default function AcademicYearsPage() {
                   of "{activeYear?.name}".
                 </div>
                 <div className="text-sm text-gray-600 mt-2">
-                  You can always switch back to a previous year using the "Switch to This Year"
+                  You can always switch back to a previous year using the "Activate"
                   button.
                 </div>
               </div>
@@ -582,37 +487,6 @@ export default function AcademicYearsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Confirmation Dialog for Ending Year */}
-      <AlertDialog open={showEndConfirm} onOpenChange={setShowEndConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>End Academic Year?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div>
-                <div className="font-semibold text-red-600">
-                  ⚠️ This action cannot be undone!
-                </div>
-                <div className="mt-2">
-                  Are you sure you want to end <strong>"{pendingActionYear?.name}"</strong>?
-                </div>
-                <div className="mt-2">
-                  This will close enrollment for this academic year permanently.
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmEnd}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Yes, End Year
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Confirmation Dialog for Deleting Year */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
@@ -628,7 +502,7 @@ export default function AcademicYearsPage() {
                 </div>
                 <div className="mt-2">
                   This will permanently delete the academic year and all related enrollments
-                  ({pendingActionYear?._count.enrollments || 0} enrollment records).
+                  ({pendingActionYear?._count?.enrollments || 0} enrollment records).
                 </div>
                 <div className="mt-2 text-sm text-muted-foreground">
                   Note: This is intended for testing purposes only.
@@ -691,15 +565,16 @@ export default function AcademicYearsPage() {
             <Button
               variant="outline"
               onClick={() => setShowEditDialog(false)}
-              disabled={editYearMutation.isPending}
+              disabled={updateMutation.isPending}
             >
               Cancel
             </Button>
             <Button
               onClick={handleSaveEdit}
-              disabled={editYearMutation.isPending}
+              disabled={updateMutation.isPending}
             >
-              {editYearMutation.isPending ? 'Saving...' : 'Save Changes'}
+              {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -712,9 +587,7 @@ export default function AcademicYearsPage() {
           onOpenChange={setShowImportDialog}
           targetAcademicYear={importTargetYear}
           availableYears={academicYears.filter((y) => y.id !== importTargetYear.id)}
-          onSuccess={() => {
-            void queryClient.invalidateQueries({ queryKey: ['academic-years'] })
-          }}
+          onSuccess={() => {}}
         />
       )}
     </div>

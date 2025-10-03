@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const studentIds = [...new Set(enrollments.map((e) => e.studentId))]
 
     // Get students data
-    const students = await prisma.student.findMany({
+    const studentsRaw = await prisma.student.findMany({
       where: {
         id: { in: studentIds },
       },
@@ -49,13 +49,23 @@ export async function GET(request: NextRequest) {
         fullName: true,
         gender: true,
         gradeLevel: true,
-        section: true,
+        section: {
+          select: {
+            name: true,
+          },
+        },
         barangay: true,
         city: true,
         enrollmentStatus: true,
         isTransferee: true,
       },
     })
+
+    // Map students to extract section name
+    const students = studentsRaw.map((student) => ({
+      ...student,
+      section: student.section?.name || null,
+    }))
 
     // Calculate statistics
     const totalStudents = students.length

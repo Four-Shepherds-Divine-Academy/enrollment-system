@@ -39,7 +39,8 @@ model Student {
 
   // Academic Information
   gradeLevel       String
-  section          Section?
+  sectionId        String?
+  section          Section?         @relation(fields: [sectionId], references: [id])
   enrollmentStatus EnrollmentStatus @default(PENDING)
   isTransferee     Boolean          @default(false) // Is transferee from another school
   previousSchool   String?          // Previous school name if transferee
@@ -58,6 +59,7 @@ model Student {
   @@index([enrollmentStatus])
   @@index([barangay])
   @@index([city])
+  @@index([sectionId])
 }
 
 model AcademicYear {
@@ -68,7 +70,6 @@ model AcademicYear {
   isActive         Boolean          @default(false)
 
   enrollments      Enrollment[]
-  gradeSections    GradeSection[]
 
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -76,20 +77,21 @@ model AcademicYear {
   @@index([isActive])
 }
 
-model GradeSection {
+model Section {
   id               String           @id @default(cuid())
-  academicYearId   String
-  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
-
+  name             String           // e.g., "Enthusiasm", "Obedience"
   gradeLevel       String           // e.g., "Kinder 1", "Grade 1"
-  section          Section          // e.g., Enthusiasm, Obedience
+  isActive         Boolean          @default(true)
+
+  students         Student[]
+  enrollments      Enrollment[]
 
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  @@unique([academicYearId, gradeLevel, section])
-  @@index([academicYearId])
+  @@unique([name, gradeLevel])
   @@index([gradeLevel])
+  @@index([isActive])
 }
 
 model Enrollment {
@@ -102,7 +104,8 @@ model Enrollment {
 
   schoolYear       String           // e.g., "2024-2025" (denormalized for quick access)
   gradeLevel       String
-  section          Section?
+  sectionId        String?
+  section          Section?         @relation(fields: [sectionId], references: [id])
   enrollmentDate   DateTime         @default(now())
   status           EnrollmentStatus @default(ENROLLED)
 
@@ -112,6 +115,7 @@ model Enrollment {
   @@index([studentId])
   @@index([academicYearId])
   @@index([schoolYear])
+  @@index([sectionId])
 }
 
 model Admin {
@@ -171,24 +175,3 @@ enum NotificationType {
   ALERT
 }
 
-enum Section {
-  // Kinder sections
-  Enthusiasm
-  Generosity
-
-  // Elementary sections
-  Obedience
-  Hospitality
-  Simplicity
-  Benevolence
-  Sincerity
-  Responsibility
-
-  // Junior High sections
-  Perseverance
-  Integrity
-
-  // Senior High sections
-  Optimism
-  Dependability
-}

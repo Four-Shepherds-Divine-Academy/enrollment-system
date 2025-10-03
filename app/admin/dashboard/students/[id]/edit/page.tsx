@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { useQuery, useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { studentSchema } from '@/lib/validations/student'
@@ -20,7 +19,11 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
+import { useStudent, useUpdateStudent } from '@/hooks/use-students'
+import { useSections } from '@/hooks/use-sections'
+import { usePhLocations } from '@/hooks/use-ph-locations'
+import { StudentRemarksField } from '@/components/student-remarks-field'
 
 type StudentFormData = z.infer<typeof studentSchema>
 
@@ -50,6 +53,7 @@ export default function EditStudentPage() {
   const params = useParams()
   const router = useRouter()
   const studentId = params.id as string
+  const [sectionValue, setSectionValue] = useState<string>('')
 
   const {
     register,
@@ -58,88 +62,111 @@ export default function EditStudentPage() {
     setValue,
     watch,
   } = useForm<StudentFormData>({
+    // @ts-expect-error - Type mismatch between duplicate react-hook-form types in node_modules
     resolver: zodResolver(studentSchema),
   })
 
   const isTransferee = watch('isTransferee')
+  const selectedGradeLevel = watch('gradeLevel')
 
-  // Fetch student data
-  const { data: student, isLoading } = useQuery<Student>({
-    queryKey: ['student', studentId],
-    queryFn: async () => {
-      const response = await fetch(`/api/students/${studentId}`)
-      if (!response.ok) throw new Error('Failed to fetch student')
-      return response.json()
-    },
+  // React Query hooks
+  const { data: student, isLoading } = useStudent(studentId)
+  const updateMutation = useUpdateStudent()
+  const { data: sections = [], isLoading: loadingSections } = useSections({
+    gradeLevel: selectedGradeLevel || '',
+    status: 'active',
   })
+
+  // Philippine locations hook
+  const {
+    provinces,
+    cities,
+    barangays,
+    selectedProvince,
+    selectedCity,
+    setSelectedProvince,
+    setSelectedCity,
+  } = usePhLocations()
 
   // Populate form when student data is loaded
   useEffect(() => {
     if (student) {
+      // Set basic fields first
       Object.entries(student).forEach(([key, value]) => {
         if (key === 'dateOfBirth') {
           setValue(key as any, new Date(value).toISOString().split('T')[0])
+        } else if (key === 'section') {
+          // Skip section here, we'll handle it separately
+          return
         } else if (key in studentSchema.shape) {
           setValue(key as any, value ?? '')
         }
       })
-    }
-  }, [student, setValue])
 
-  // Update mutation
-  const updateMutation = useMutation({
-    mutationFn: async (data: StudentFormData) => {
-      const response = await fetch(`/api/students/${studentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to update student')
+      // Handle section separately - set the section ID if it exists
+      if (student.section && typeof student.section === 'object') {
+        const secId = student.section.id
+        setValue('section', secId)
+        setSectionValue(secId)
+      } else if (student.sectionId) {
+        setValue('section', student.sectionId)
+        setSectionValue(student.sectionId)
       }
-      return response.json()
-    },
-    onSuccess: () => {
-      toast.success('Student updated successfully')
-      router.push('/admin/dashboard/students')
-    },
-    onError: (error: Error) => {
-      toast.error(error.message)
-    },
-  })
+
+      // Initialize location dropdowns based on student data
+      if (student.province) {
+        const province = provinces.find(p => p.name === student.province)
+        if (province) {
+          setSelectedProvince(province.code)
+        }
+      }
+      if (student.city) {
+        const city = cities.find(c => c.name === student.city)
+        if (city) {
+          setSelectedCity(city.code)
+        }
+      }
+    }
+  }, [student, setValue, provinces, cities, setSelectedProvince, setSelectedCity])
 
   const onSubmit = (data: StudentFormData) => {
-    updateMutation.mutate(data)
+    updateMutation.mutate(
+      { id: studentId, data },
+      {
+        onSuccess: () => {
+          toast.success('Student updated successfully')
+          router.push('/admin/dashboard/students')
+        },
+      }
+    )
   }
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p>Loading...</p>
+        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push('/admin/dashboard/students')}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Students
-        </Button>
-      </div>
-
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Edit Student</h2>
-          <p className="text-gray-600 mt-1">Update student information</p>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push('/admin/dashboard/students')}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Edit Student</h2>
+            <p className="text-sm text-gray-600 mt-1">Update student information</p>
+          </div>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-3">
           <Button
             type="button"
             variant="outline"
@@ -152,6 +179,7 @@ export default function EditStudentPage() {
             form="edit-student-form"
             disabled={updateMutation.isPending}
           >
+            {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {updateMutation.isPending ? 'Updating...' : 'Update Student'}
           </Button>
         </div>
@@ -159,59 +187,61 @@ export default function EditStudentPage() {
 
       <form id="edit-student-form" onSubmit={handleSubmit(onSubmit)}>
         <Card>
-          <CardHeader>
-            <CardTitle>Student Information</CardTitle>
+          <CardHeader className="border-b">
+            <CardTitle className="text-lg">Student Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-8 pt-6">
             {/* Personal Information */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Personal Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="firstName">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <h3 className="font-semibold text-base text-gray-900">Personal Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName" className="text-sm font-medium">
                     First Name <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="firstName" {...register('firstName')} />
+                  <Input id="firstName" {...register('firstName')} className="h-10" />
                   {errors.firstName && (
-                    <p className="text-sm text-red-500 mt-1">
+                    <p className="text-xs text-red-500 mt-1">
                       {errors.firstName.message}
                     </p>
                   )}
                 </div>
-                <div>
-                  <Label htmlFor="middleName">Middle Name</Label>
-                  <Input id="middleName" {...register('middleName')} />
+                <div className="space-y-2">
+                  <Label htmlFor="middleName" className="text-sm font-medium">Middle Name</Label>
+                  <Input id="middleName" {...register('middleName')} className="h-10" />
                 </div>
-                <div>
-                  <Label htmlFor="lastName">
+                <div className="space-y-2">
+                  <Label htmlFor="lastName" className="text-sm font-medium">
                     Last Name <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="lastName" {...register('lastName')} />
+                  <Input id="lastName" {...register('lastName')} className="h-10" />
                   {errors.lastName && (
-                    <p className="text-sm text-red-500 mt-1">
+                    <p className="text-xs text-red-500 mt-1">
                       {errors.lastName.message}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="lrn">LRN</Label>
-                  <Input id="lrn" {...register('lrn')} />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="lrn" className="text-sm font-medium">LRN</Label>
+                  <Input id="lrn" {...register('lrn')} className="h-10 font-mono" />
                   {errors.lrn && (
-                    <p className="text-sm text-red-500 mt-1">{errors.lrn.message}</p>
+                    <p className="text-xs text-red-500 mt-1">{errors.lrn.message}</p>
                   )}
                 </div>
-                <div>
-                  <Label htmlFor="gender">
+                <div className="space-y-2">
+                  <Label htmlFor="gender" className="text-sm font-medium">
                     Gender <span className="text-red-500">*</span>
                   </Label>
                   <Select
                     onValueChange={(value) => setValue('gender', value as any)}
                     defaultValue={student?.gender}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 w-full">
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
                     <SelectContent>
@@ -220,18 +250,18 @@ export default function EditStudentPage() {
                     </SelectContent>
                   </Select>
                   {errors.gender && (
-                    <p className="text-sm text-red-500 mt-1">
+                    <p className="text-xs text-red-500 mt-1">
                       {errors.gender.message}
                     </p>
                   )}
                 </div>
-                <div>
-                  <Label htmlFor="dateOfBirth">
+                <div className="space-y-2">
+                  <Label htmlFor="dateOfBirth" className="text-sm font-medium">
                     Date of Birth <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="dateOfBirth" type="date" {...register('dateOfBirth')} />
+                  <Input id="dateOfBirth" type="date" {...register('dateOfBirth')} className="h-10" />
                   {errors.dateOfBirth && (
-                    <p className="text-sm text-red-500 mt-1">
+                    <p className="text-xs text-red-500 mt-1">
                       {errors.dateOfBirth.message}
                     </p>
                   )}
@@ -241,50 +271,120 @@ export default function EditStudentPage() {
 
             {/* Address Information */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Address Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="houseNumber">House Number</Label>
-                  <Input id="houseNumber" {...register('houseNumber')} />
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <h3 className="font-semibold text-base text-gray-900">Address Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="houseNumber" className="text-sm font-medium">House Number</Label>
+                  <Input id="houseNumber" {...register('houseNumber')} className="h-10" placeholder="e.g., Lot 123 or Unit 4B" />
                 </div>
-                <div>
-                  <Label htmlFor="street">Street</Label>
-                  <Input id="street" {...register('street')} />
+                <div className="space-y-2">
+                  <Label htmlFor="street" className="text-sm font-medium">Street</Label>
+                  <Input id="street" {...register('street')} className="h-10" placeholder="e.g., Rizal Street" />
                 </div>
-                <div>
-                  <Label htmlFor="subdivision">Subdivision</Label>
-                  <Input id="subdivision" {...register('subdivision')} />
+                <div className="space-y-2">
+                  <Label htmlFor="subdivision" className="text-sm font-medium">Subdivision</Label>
+                  <Input id="subdivision" {...register('subdivision')} className="h-10" placeholder="e.g., Green Valley" />
                 </div>
-                <div>
-                  <Label htmlFor="barangay">
-                    Barangay <span className="text-red-500">*</span>
+                <div className="space-y-2">
+                  <Label htmlFor="province" className="text-sm font-medium">
+                    Province <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="barangay" {...register('barangay')} />
-                  {errors.barangay && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.barangay.message}
+                  <Select
+                    value={selectedProvince}
+                    onValueChange={(value) => {
+                      setSelectedProvince(value)
+                      const province = provinces.find(p => p.code === value)
+                      setValue('province', province?.name || '')
+                      setValue('city', '')
+                      setValue('barangay', '')
+                      setSelectedCity('')
+                    }}
+                  >
+                    <SelectTrigger className="h-10 w-full">
+                      <SelectValue placeholder="Select province" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {provinces.map((province) => (
+                        <SelectItem key={province.code} value={province.code}>
+                          {province.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.province && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors.province.message}
                     </p>
                   )}
                 </div>
-                <div>
-                  <Label htmlFor="city">
-                    City <span className="text-red-500">*</span>
+                <div className="space-y-2">
+                  <Label htmlFor="city" className="text-sm font-medium">
+                    City / Municipality <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="city" {...register('city')} />
+                  <Select
+                    value={selectedCity}
+                    onValueChange={(value) => {
+                      setSelectedCity(value)
+                      const city = cities.find(c => c.code === value)
+                      setValue('city', city?.name || '')
+                      setValue('barangay', '')
+                    }}
+                    disabled={!selectedProvince}
+                  >
+                    <SelectTrigger className="h-10 w-full">
+                      <SelectValue placeholder={!selectedProvince ? "Select province first" : "Select city"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cities.map((city) => (
+                        <SelectItem key={city.code} value={city.code}>
+                          {city.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {errors.city && (
-                    <p className="text-sm text-red-500 mt-1">
+                    <p className="text-xs text-red-500 mt-1">
                       {errors.city.message}
                     </p>
                   )}
                 </div>
-                <div>
-                  <Label htmlFor="province">
-                    Province <span className="text-red-500">*</span>
+                <div className="space-y-2">
+                  <Label htmlFor="barangay" className="text-sm font-medium">
+                    Barangay <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="province" {...register('province')} />
-                  {errors.province && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.province.message}
+                  {barangays.length > 0 ? (
+                    <Select
+                      value={barangays.find(b => b.name === watch('barangay'))?.code || ''}
+                      onValueChange={(value) => {
+                        const barangay = barangays.find(b => b.code === value)
+                        setValue('barangay', barangay?.name || '')
+                      }}
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder="Select barangay" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {barangays.map((barangay) => (
+                          <SelectItem key={barangay.code} value={barangay.code}>
+                            {barangay.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id="barangay"
+                      {...register('barangay')}
+                      className="h-10"
+                      placeholder={!selectedCity ? "Select city first" : "Enter barangay"}
+                      disabled={!selectedCity}
+                    />
+                  )}
+                  {errors.barangay && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors.barangay.message}
                     </p>
                   )}
                 </div>
@@ -297,8 +397,10 @@ export default function EditStudentPage() {
 
             {/* Contact & Guardian */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Contact & Guardian Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <h3 className="font-semibold text-base text-gray-900">Contact & Guardian Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="contactNumber">
                     Contact Number <span className="text-red-500">*</span>
@@ -326,8 +428,10 @@ export default function EditStudentPage() {
 
             {/* Enrollment Details */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Enrollment Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <h3 className="font-semibold text-base text-gray-900">Enrollment Details</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <Label htmlFor="gradeLevel">
                     Grade Level <span className="text-red-500">*</span>
@@ -336,7 +440,7 @@ export default function EditStudentPage() {
                     onValueChange={(value) => setValue('gradeLevel', value)}
                     defaultValue={student?.gradeLevel}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 w-full">
                       <SelectValue placeholder="Select grade level" />
                     </SelectTrigger>
                     <SelectContent>
@@ -355,7 +459,45 @@ export default function EditStudentPage() {
                 </div>
                 <div>
                   <Label htmlFor="section">Section</Label>
-                  <Input id="section" {...register('section')} />
+                  <Select
+                    onValueChange={(value) => {
+                      setValue('section', value)
+                      setSectionValue(value)
+                    }}
+                    value={sectionValue || undefined}
+                    disabled={!selectedGradeLevel || loadingSections}
+                  >
+                    <SelectTrigger className="h-10 w-full">
+                      <SelectValue
+                        placeholder={
+                          !selectedGradeLevel
+                            ? "Select grade level first"
+                            : loadingSections
+                            ? "Loading sections..."
+                            : sections.length === 0
+                            ? "No sections available"
+                            : "Select section"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sections.map((section: any) => (
+                        <SelectItem key={section.id} value={section.id}>
+                          {section.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!selectedGradeLevel && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Please select a grade level to view available sections
+                    </p>
+                  )}
+                  {selectedGradeLevel && sections.length === 0 && !loadingSections && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      No sections configured for this grade level
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="enrollmentStatus">
@@ -365,7 +507,7 @@ export default function EditStudentPage() {
                     onValueChange={(value) => setValue('enrollmentStatus', value as any)}
                     defaultValue={student?.enrollmentStatus}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 w-full">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -409,7 +551,10 @@ export default function EditStudentPage() {
 
               <div>
                 <Label htmlFor="remarks">Remarks</Label>
-                <Input id="remarks" {...register('remarks')} />
+                <StudentRemarksField
+                  value={watch('remarks') || ''}
+                  onChange={(value) => setValue('remarks', value)}
+                />
               </div>
             </div>
           </CardContent>

@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
-import { mapSectionToEnum, GRADE_SECTION_MAPPINGS_2023_2024 } from './seed-helpers'
+import { createSections, getSectionId } from './seed-helpers'
 
 const prisma = new PrismaClient()
 
@@ -21,6 +21,9 @@ async function main() {
   })
   console.log('Admin created:', admin.email)
 
+  // Create sections
+  await createSections(prisma)
+
   // Create 2023-2024 academic year
   const academicYear = await prisma.academicYear.upsert({
     where: { name: '2023-2024' },
@@ -35,29 +38,6 @@ async function main() {
     },
   })
   console.log('Academic year created:', academicYear.name)
-
-  // Create grade-section assignments for this academic year
-  console.log('Creating grade-section assignments...')
-  for (const [gradeLevel, sections] of Object.entries(GRADE_SECTION_MAPPINGS_2023_2024)) {
-    for (const section of sections) {
-      await prisma.gradeSection.upsert({
-        where: {
-          academicYearId_gradeLevel_section: {
-            academicYearId: academicYear.id,
-            gradeLevel,
-            section,
-          },
-        },
-        update: {},
-        create: {
-          academicYearId: academicYear.id,
-          gradeLevel,
-          section,
-        },
-      })
-      console.log(`✓ Created grade-section: ${gradeLevel} - ${section}`)
-    }
-  }
 
   // Helper function to parse address
   const parseAddress = (addressStr: string) => {
@@ -215,62 +195,54 @@ async function main() {
     const fullName = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, ' ').trim()
     const address = parseAddress(data.address)
 
-    // Use upsert for students with LRN
-    let student
+    const dateOfBirth = new Date(data.birthday)
+
+    // Find existing student by LRN or fullName+dateOfBirth
+    let student = null
     if (data.lrn) {
-      student = await prisma.student.upsert({
+      student = await prisma.student.findUnique({
         where: { lrn: data.lrn },
-        update: {
-          firstName,
-          middleName,
-          lastName,
-          fullName,
-          gender: data.gender as 'Male' | 'Female',
-          contactNumber: data.contact,
-          dateOfBirth: new Date(data.birthday),
-          houseNumber: address.houseNumber,
-          street: address.street,
-          barangay: address.barangay,
-          city: address.city,
-          province: address.province,
-          parentGuardian: data.guardian,
-          gradeLevel: data.gradeLevel,
-          enrollmentStatus: 'ENROLLED',
-          remarks: (data as any).remarks || null,
-        },
-        create: {
-          lrn: data.lrn,
-          firstName,
-          middleName,
-          lastName,
-          fullName,
-          gender: data.gender as 'Male' | 'Female',
-          contactNumber: data.contact,
-          dateOfBirth: new Date(data.birthday),
-          houseNumber: address.houseNumber,
-          street: address.street,
-          barangay: address.barangay,
-          city: address.city,
-          province: address.province,
-          parentGuardian: data.guardian,
-          gradeLevel: data.gradeLevel,
-          enrollmentStatus: 'ENROLLED',
-          isTransferee: false,
-          remarks: (data as any).remarks || null,
+      })
+    }
+
+    if (!student) {
+      // Try to find by fullName and dateOfBirth
+      student = await prisma.student.findUnique({
+        where: {
+          fullName_dateOfBirth: {
+            fullName,
+            dateOfBirth,
+          },
         },
       })
+    }
+
+    if (student) {
+      // Student exists - only update current grade/section if this is the active academic year
+      if (academicYear.isActive) {
+        const sectionId = await getSectionId(prisma, data.section, data.gradeLevel)
+        await prisma.student.update({
+          where: { id: student.id },
+          data: {
+            gradeLevel: data.gradeLevel,
+            sectionId: sectionId,
+            enrollmentStatus: 'ENROLLED',
+          },
+        })
+      }
     } else {
-      // For students without LRN, create new record
+      // Student doesn't exist - create new student
+      const sectionId = await getSectionId(prisma, data.section, data.gradeLevel)
       student = await prisma.student.create({
         data: {
-          lrn: null,
+          lrn: data.lrn || null,
           firstName,
           middleName,
           lastName,
           fullName,
           gender: data.gender as 'Male' | 'Female',
           contactNumber: data.contact,
-          dateOfBirth: new Date(data.birthday),
+          dateOfBirth,
           houseNumber: address.houseNumber,
           street: address.street,
           barangay: address.barangay,
@@ -278,6 +250,7 @@ async function main() {
           province: address.province,
           parentGuardian: data.guardian,
           gradeLevel: data.gradeLevel,
+          sectionId: sectionId,
           enrollmentStatus: 'ENROLLED',
           isTransferee: false,
           remarks: (data as any).remarks || null,
@@ -294,18 +267,19 @@ async function main() {
     })
 
     if (!existingEnrollment) {
-      const sectionEnum = mapSectionToEnum(data.section)
+      const sectionId = await getSectionId(prisma, data.section, data.gradeLevel)
+
       await prisma.enrollment.create({
         data: {
           studentId: student.id,
           academicYearId: academicYear.id,
           schoolYear: academicYear.name,
           gradeLevel: data.gradeLevel,
-          section: sectionEnum,
+          sectionId: sectionId,
           status: 'ENROLLED',
         },
       })
-      console.log(`✓ ${fullName} - ${data.gradeLevel} - ${sectionEnum}`)
+      console.log(`✓ ${fullName} - ${data.gradeLevel} - ${data.section}`)
     } else {
       console.log(`• ${fullName} - Already enrolled`)
     }

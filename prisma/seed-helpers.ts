@@ -1,69 +1,108 @@
-import { Section } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 
 /**
- * Maps old section strings to Section enum values
+ * Section definitions for all grade levels
  */
-export function mapSectionToEnum(sectionText: string): Section | null {
+export const SECTION_DEFINITIONS = [
+  // Kinder sections
+  { name: 'Enthusiasm', gradeLevel: 'Kinder 1' },
+  { name: 'Enthusiasm', gradeLevel: 'Kinder 2' },
+  { name: 'Generosity', gradeLevel: 'Kinder 2' },
+
+  // Elementary sections
+  { name: 'Obedience', gradeLevel: 'Grade 1' },
+  { name: 'Hospitality', gradeLevel: 'Grade 2' },
+  { name: 'Simplicity', gradeLevel: 'Grade 3' },
+  { name: 'Benevolence', gradeLevel: 'Grade 4' },
+  { name: 'Sincerity', gradeLevel: 'Grade 5' },
+  { name: 'Responsibility', gradeLevel: 'Grade 6' },
+
+  // Junior High sections
+  { name: 'Perseverance', gradeLevel: 'Grade 7' },
+  { name: 'Integrity', gradeLevel: 'Grade 8' },
+  { name: 'Perseverance', gradeLevel: 'Grade 9' },
+  { name: 'Integrity', gradeLevel: 'Grade 10' },
+
+  // Senior High sections
+  { name: 'Optimism', gradeLevel: 'Grade 11' },
+  { name: 'Dependability', gradeLevel: 'Grade 12' },
+]
+
+/**
+ * Creates all section records in the database
+ */
+export async function createSections(prisma: PrismaClient) {
+  console.log('Creating sections...')
+
+  for (const sectionDef of SECTION_DEFINITIONS) {
+    await prisma.section.upsert({
+      where: {
+        name_gradeLevel: {
+          name: sectionDef.name,
+          gradeLevel: sectionDef.gradeLevel,
+        },
+      },
+      update: {},
+      create: {
+        name: sectionDef.name,
+        gradeLevel: sectionDef.gradeLevel,
+        isActive: true,
+      },
+    })
+  }
+
+  console.log(`✓ Created ${SECTION_DEFINITIONS.length} sections`)
+}
+
+/**
+ * Gets section ID by name and grade level
+ */
+export async function getSectionId(
+  prisma: PrismaClient,
+  sectionText: string | null,
+  gradeLevel: string
+): Promise<string | null> {
+  // Handle null or empty section text
+  if (!sectionText || sectionText.trim() === '') {
+    return null
+  }
+
+  // Extract section name from text like "Grade 1 - Obedience"
   const sectionName = sectionText.split(' - ')[1]?.trim() || sectionText.trim()
 
-  switch (sectionName) {
-    case 'Enthusiasm':
-      return Section.Enthusiasm
-    case 'Generosity':
-      return Section.Generosity
-    case 'Obedience':
-      return Section.Obedience
-    case 'Hospitality':
-      return Section.Hospitality
-    case 'Simplicity':
-      return Section.Simplicity
-    case 'Benevolence':
-      return Section.Benevolence
-    case 'Sincerity':
-      return Section.Sincerity
-    case 'Responsibility':
-      return Section.Responsibility
-    case 'Perseverance':
-      return Section.Perseverance
-    case 'Integrity':
-      return Section.Integrity
-    case 'Optimism':
-      return Section.Optimism
-    case 'Dependability':
-      return Section.Dependability
-    default:
-      return null
-  }
+  const section = await prisma.section.findUnique({
+    where: {
+      name_gradeLevel: {
+        name: sectionName,
+        gradeLevel: gradeLevel,
+      },
+    },
+  })
+
+  return section?.id || null
 }
 
 /**
- * Grade level to section mappings for each academic year
+ * Maps old section strings to section names
  */
-export const GRADE_SECTION_MAPPINGS_2023_2024 = {
-  'Kinder 1': [Section.Enthusiasm],
-  'Kinder 2': [Section.Enthusiasm],
-  'Grade 1': [Section.Obedience],
-  'Grade 2': [Section.Hospitality],
-  'Grade 3': [Section.Simplicity],
-  'Grade 4': [Section.Benevolence],
-  'Grade 5': [Section.Sincerity],
-  'Grade 6': [Section.Responsibility],
-  'Grade 7': [Section.Perseverance],
-  'Grade 8': [Section.Integrity],
-  'Grade 9': [Section.Optimism],
-  'Grade 10': [Section.Dependability],
-}
+export function extractSectionName(sectionText: string): string {
+  const sectionName = sectionText.split(' - ')[1]?.trim() || sectionText.trim()
 
-export const GRADE_SECTION_MAPPINGS_2025_2026 = {
-  'Kinder 2': [Section.Generosity],
-  'Grade 1': [Section.Obedience],
-  'Grade 2': [Section.Hospitality],
-  'Grade 3': [Section.Simplicity],
-  'Grade 4': [Section.Benevolence],
-  'Grade 5': [Section.Sincerity],
-  'Grade 6': [Section.Responsibility],
-  'Grade 7': [Section.Perseverance],
-  'Grade 8': [Section.Integrity],
-  'Grade 9': [Section.Optimism],
-  'Grade 10': [Section.Dependability],
+  // Map of valid section names
+  const validSections = [
+    'Enthusiasm',
+    'Generosity',
+    'Obedience',
+    'Hospitality',
+    'Simplicity',
+    'Benevolence',
+    'Sincerity',
+    'Responsibility',
+    'Perseverance',
+    'Integrity',
+    'Optimism',
+    'Dependability',
+  ]
+
+  return validSections.includes(sectionName) ? sectionName : 'Enthusiasm'
 }

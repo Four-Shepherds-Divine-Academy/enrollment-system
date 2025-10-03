@@ -46,7 +46,7 @@ export async function POST(
       where: { id },
       data: {
         gradeLevel: validatedData.gradeLevel,
-        section: validatedData.section || null,
+        sectionId: validatedData.section || null,
       },
     })
 
@@ -58,7 +58,7 @@ export async function POST(
       },
       data: {
         gradeLevel: validatedData.gradeLevel,
-        section: validatedData.section || null,
+        sectionId: validatedData.section || null,
       },
     })
 

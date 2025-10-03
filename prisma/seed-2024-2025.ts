@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { createSections, getSectionId } from './seed-helpers'
 
 const prisma = new PrismaClient()
 
@@ -48,6 +49,9 @@ function parseAddress(address: string) {
 
 async function main() {
   console.log('Seeding ALL student data from PDF...')
+
+  // Create sections
+  await createSections(prisma)
 
   // Get active academic year (2024-2025)
   let academicYear = await prisma.academicYear.findFirst({
@@ -223,61 +227,46 @@ async function main() {
       // Parse date
       const dateOfBirth = new Date(s.bday)
 
-      // Use upsert for students with LRN to handle returning students
-      let student
+      // Get section ID if section is provided
+      const sectionId = s.section ? await getSectionId(prisma, s.section, s.grade) : null
+
+      // Find existing student by LRN or fullName+dateOfBirth
+      let student = null
       if (s.lrn) {
-        student = await prisma.student.upsert({
+        student = await prisma.student.findUnique({
           where: { lrn: s.lrn },
-          update: {
-            firstName,
-            middleName: middleName || null,
-            lastName,
-            fullName,
-            gender: s.gender as 'Male' | 'Female',
-            contactNumber: s.contact || '00000000000',
-            dateOfBirth,
-            houseNumber: addr.houseNumber || null,
-            street: addr.street || null,
-            subdivision: addr.subdivision || null,
-            barangay: addr.barangay,
-            city: addr.city,
-            province: addr.province,
-            parentGuardian: s.guardian || 'N/A',
-            gradeLevel: s.grade,
-            section: s.section || null,
-            enrollmentStatus: 'ENROLLED',
-            remarks: s.remarks || null,
-          },
-          create: {
-            lrn: s.lrn,
-            firstName,
-            middleName: middleName || null,
-            lastName,
-            fullName,
-            gender: s.gender as 'Male' | 'Female',
-            contactNumber: s.contact || '00000000000',
-            dateOfBirth,
-            houseNumber: addr.houseNumber || null,
-            street: addr.street || null,
-            subdivision: addr.subdivision || null,
-            barangay: addr.barangay,
-            city: addr.city,
-            province: addr.province,
-            zipCode: null,
-            parentGuardian: s.guardian || 'N/A',
-            gradeLevel: s.grade,
-            section: s.section || null,
-            enrollmentStatus: 'ENROLLED',
-            isTransferee: false,
-            previousSchool: null,
-            remarks: s.remarks || null,
+        })
+      }
+
+      if (!student) {
+        // Try to find by fullName and dateOfBirth
+        student = await prisma.student.findUnique({
+          where: {
+            fullName_dateOfBirth: {
+              fullName,
+              dateOfBirth,
+            },
           },
         })
+      }
+
+      if (student) {
+        // Student exists - only update current grade/section if this is the active academic year
+        if (academicYear.isActive) {
+          await prisma.student.update({
+            where: { id: student.id },
+            data: {
+              gradeLevel: s.grade,
+              sectionId: sectionId,
+              enrollmentStatus: 'ENROLLED',
+            },
+          })
+        }
       } else {
-        // For students without LRN, create new record
+        // Student doesn't exist - create new student
         student = await prisma.student.create({
           data: {
-            lrn: null,
+            lrn: s.lrn || null,
             firstName,
             middleName: middleName || null,
             lastName,
@@ -294,7 +283,7 @@ async function main() {
             zipCode: null,
             parentGuardian: s.guardian || 'N/A',
             gradeLevel: s.grade,
-            section: s.section || null,
+            sectionId: sectionId,
             enrollmentStatus: 'ENROLLED',
             isTransferee: false,
             previousSchool: null,
@@ -312,14 +301,14 @@ async function main() {
       })
 
       if (!existingEnrollment) {
-        // Create enrollment
+        // Create enrollment record for this academic year
         await prisma.enrollment.create({
           data: {
             studentId: student.id,
             academicYearId: academicYear.id,
             schoolYear: academicYear.name,
             gradeLevel: s.grade,
-            section: s.section || null,
+            sectionId: sectionId,
             status: 'ENROLLED',
           },
         })

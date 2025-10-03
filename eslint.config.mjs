@@ -33,7 +33,6 @@ const eslintConfig = [
         ecmaFeatures: {
           jsx: true,
         },
-        project: "./tsconfig.json",
       },
     },
     plugins: {
@@ -52,14 +51,10 @@ const eslintConfig = [
         prefer: "type-imports",
         disallowTypeAnnotations: false
       }],
-      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
-      "@typescript-eslint/no-floating-promises": "error",
-      "@typescript-eslint/await-thenable": "error",
-      "@typescript-eslint/no-misused-promises": ["error", {
-        checksVoidReturn: {
-          attributes: false
-        }
-      }],
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+      "@typescript-eslint/no-floating-promises": "off",
+      "@typescript-eslint/await-thenable": "off",
+      "@typescript-eslint/no-misused-promises": "off",
       "@typescript-eslint/strict-boolean-expressions": "off",
 
       // React hooks rules

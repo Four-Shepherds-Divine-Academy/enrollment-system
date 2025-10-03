@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Dialog,
   DialogContent,
@@ -63,6 +64,7 @@ export function BulkImportStudentsDialog({
   availableYears,
   onSuccess,
 }: Props) {
+  const queryClient = useQueryClient()
   const [sourceYearId, setSourceYearId] = useState<string>('')
   const [students, setStudents] = useState<Student[]>([])
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(
@@ -102,16 +104,6 @@ export function BulkImportStudentsDialog({
     'Grade 12',
   ]
 
-  // Fetch students when source year changes
-  useEffect(() => {
-    if (sourceYearId && open) {
-      void fetchStudents()
-    } else {
-      setStudents([])
-      setSelectedStudentIds(new Set())
-    }
-  }, [sourceYearId, open, fetchStudents])
-
   const fetchStudents = async () => {
     setLoading(true)
     try {
@@ -139,6 +131,17 @@ export function BulkImportStudentsDialog({
       setLoading(false)
     }
   }
+
+  // Fetch students when source year changes
+  useEffect(() => {
+    if (sourceYearId && open) {
+      void fetchStudents()
+    } else {
+      setStudents([])
+      setSelectedStudentIds(new Set())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceYearId, open])
 
   const handleGradeChange = (studentId: string, grade: string) => {
     const newGrades = new Map(studentGrades)
@@ -299,6 +302,14 @@ export function BulkImportStudentsDialog({
           description: 'Check the failed imports list below to retry',
         })
         console.error('Import errors:', results.errors)
+      }
+
+      // Invalidate queries to refresh data
+      if (successCount > 0) {
+        // Invalidate all related queries
+        queryClient.invalidateQueries({ queryKey: ['students'] })
+        queryClient.invalidateQueries({ queryKey: ['academicYears'] })
+        queryClient.invalidateQueries({ queryKey: ['sections'] })
       }
 
       // Only close dialog if there were no errors

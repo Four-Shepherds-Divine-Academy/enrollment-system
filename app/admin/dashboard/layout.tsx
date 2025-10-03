@@ -22,9 +22,13 @@ import {
   Calendar,
   Users,
   UserPlus,
-  ChevronDown
+  ChevronDown,
+  LayoutGrid,
+  DollarSign,
+  Receipt
 } from 'lucide-react'
 import { NotificationCenter } from '@/components/notification-center'
+import { ActiveYearBadge } from '@/components/active-year-badge'
 
 export default async function AdminLayout({
   children,
@@ -36,18 +40,6 @@ export default async function AdminLayout({
   if (!session) {
     redirect('/admin/login')
   }
-
-  // Fetch active academic year
-  const activeYear = await prisma.academicYear.findFirst({
-    where: { isActive: true },
-    select: {
-      id: true,
-      name: true,
-      _count: {
-        select: { enrollments: true },
-      },
-    },
-  })
 
   // Get user initials for avatar
   const userInitials = session.user?.name
@@ -79,17 +71,8 @@ export default async function AdminLayout({
 
             {/* Right Side - Active Year, Notifications & User Menu */}
             <div className="flex items-center space-x-4">
-              {activeYear && (
-                <div className="hidden sm:flex items-center px-3 py-1.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg">
-                  <span className="text-xs font-semibold text-green-700 mr-1">
-                    ACTIVE:
-                  </span>
-                  <span className="text-sm font-bold text-green-900">
-                    SY {activeYear.name}
-                  </span>
-                  <div className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                </div>
-              )}
+              {/* Active Year Badge */}
+              <ActiveYearBadge />
 
               {/* Notification Center */}
               <NotificationCenter />
@@ -147,6 +130,12 @@ export default async function AdminLayout({
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/sections" className="flex items-center cursor-pointer">
+                      <LayoutGrid className="mr-2 h-4 w-4" />
+                      <span>Manage Sections</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/admin/dashboard/reports" className="flex items-center cursor-pointer">
                       <FileText className="mr-2 h-4 w-4" />
                       <span>Reports</span>
@@ -157,12 +146,12 @@ export default async function AdminLayout({
 
                   {/* Future menu items placeholder */}
                   <DropdownMenuItem disabled>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                    <Receipt className="mr-2 h-4 w-4" />
+                    <span>Fee Management</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem disabled>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    <span>Payment History</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />

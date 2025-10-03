@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { studentSchema, type StudentFormData } from '@/lib/validations/student'
@@ -27,6 +26,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useState, useEffect } from 'react'
+import { useActiveAcademicYear } from '@/hooks/use-academic-years'
+import { useStudentSearch, useCreateStudent } from '@/hooks/use-students'
+import { useSections } from '@/hooks/use-sections'
+import { usePhLocations } from '@/hooks/use-ph-locations'
+import { StudentRemarksField } from '@/components/student-remarks-field'
 
 const GRADE_LEVELS = [
   'Kinder 1',
@@ -59,36 +63,29 @@ type ExistingStudent = {
 }
 
 export function EnrollmentForm() {
-  const queryClient = useQueryClient()
   const router = useRouter()
   const [matchingStudents, setMatchingStudents] = useState<ExistingStudent[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [isSearching, setIsSearching] = useState(false)
-  const [activeYear, setActiveYear] = useState<{ name: string } | null>(null)
-  const [noActiveYear, setNoActiveYear] = useState(false)
   const [isPreviouslyEnrolled, setIsPreviouslyEnrolled] = useState(false)
   const [manualSearchQuery, setManualSearchQuery] = useState('')
   const [manualSearchResults, setManualSearchResults] = useState<any[]>([])
   const [isManualSearching, setIsManualSearching] = useState(false)
 
-  // Check for active academic year
-  useEffect(() => {
-    const checkActiveYear = async () => {
-      try {
-        const response = await fetch('/api/academic-years/active')
-        if (response.ok) {
-          const data = await response.json()
-          setActiveYear(data)
-          setNoActiveYear(false)
-        } else {
-          setNoActiveYear(true)
-        }
-      } catch (_error) {
-        setNoActiveYear(true)
-      }
-    }
-    void checkActiveYear()
-  }, [])
+  // React Query hooks
+  const { data: activeYear, isLoading: loadingActiveYear } = useActiveAcademicYear()
+  const createMutation = useCreateStudent()
+
+  // Philippine locations hook
+  const {
+    provinces,
+    cities,
+    barangays,
+    selectedProvince,
+    selectedCity,
+    setSelectedProvince,
+    setSelectedCity,
+  } = usePhLocations()
 
   const form = useForm<StudentFormData>({
     resolver: zodResolver(studentSchema),
@@ -120,6 +117,25 @@ export function EnrollmentForm() {
   const middleName = form.watch('middleName')
   const lastName = form.watch('lastName')
   const dateOfBirth = form.watch('dateOfBirth')
+  const selectedGradeLevel = form.watch('gradeLevel')
+
+  // Fetch sections based on selected grade level
+  const { data: sections = [], isLoading: loadingSections } = useSections({
+    gradeLevel: selectedGradeLevel || '',
+    status: 'active',
+  })
+
+  // Clear section when grade level changes and section is not available
+  useEffect(() => {
+    if (selectedGradeLevel) {
+      const currentSection = form.getValues('section')
+      if (currentSection && !sections.find((s: any) => s.id === currentSection)) {
+        form.setValue('section', '')
+      }
+    } else {
+      form.setValue('section', '')
+    }
+  }, [selectedGradeLevel, sections, form])
 
   // Search for existing students when name changes (disabled when manually searching)
   useEffect(() => {
@@ -226,47 +242,24 @@ export function EnrollmentForm() {
     }
   }, [selectedStudentId, matchingStudents, form])
 
-  const createStudent = useMutation({
-    mutationFn: async (data: StudentFormData) => {
-      const response = await fetch('/api/students', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to create student')
-      }
-
-      return response.json()
-    },
-    onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['students'] })
-      form.reset()
-      setMatchingStudents([])
-      setSelectedStudentId(null)
-      toast.success('Student enrolled successfully!', {
-        description: `${data.fullName} has been enrolled for ${data.gradeLevel}`,
-        duration: 5000,
-      })
-      setTimeout(() => {
-        router.push('/admin/dashboard/students')
-      }, 1000)
-    },
-    onError: (error) => {
-      console.error('Error enrolling student:', error)
-      toast.error('Failed to enroll student', {
-        description: error.message || 'Please check the form and try again.',
-        duration: 5000,
-      })
-    },
-  })
-
   const onSubmit = (data: StudentFormData) => {
-    createStudent.mutate(data)
+    createMutation.mutate(data, {
+      onSuccess: (result) => {
+        form.reset()
+        setMatchingStudents([])
+        setSelectedStudentId(null)
+        toast.success('Student enrolled successfully!', {
+          description: `${result.fullName} has been enrolled for ${result.gradeLevel}`,
+          duration: 5000,
+        })
+        setTimeout(() => {
+          router.push('/admin/dashboard/students')
+        }, 1000)
+      },
+    })
   }
+
+  const noActiveYear = !loadingActiveYear && !activeYear
 
   return (
     <Card className="w-full max-w-4xl mx-auto">
@@ -523,7 +516,7 @@ export function EnrollmentForm() {
                         defaultValue={field.value}
                       >
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select gender" />
                           </SelectTrigger>
                         </FormControl>
@@ -564,8 +557,11 @@ export function EnrollmentForm() {
                   <FormItem>
                     <FormLabel>Contact Number *</FormLabel>
                     <FormControl>
-                      <Input placeholder="09123456789" {...field} />
+                      <Input placeholder="09123456789 or +639123456789" {...field} />
                     </FormControl>
+                    <FormDescription>
+                      Format: 09XXXXXXXXX or +639XXXXXXXXX
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -618,13 +614,34 @@ export function EnrollmentForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="barangay"
+                  name="province"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Barangay *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="San Luis" {...field} />
-                      </FormControl>
+                      <FormLabel>Province *</FormLabel>
+                      <Select
+                        value={selectedProvince}
+                        onValueChange={(value) => {
+                          setSelectedProvince(value)
+                          const province = provinces.find(p => p.code === value)
+                          form.setValue('province', province?.name || '')
+                          form.setValue('city', '')
+                          form.setValue('barangay', '')
+                          setSelectedCity('')
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select province" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {provinces.map((province) => (
+                            <SelectItem key={province.code} value={province.code}>
+                              {province.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -636,9 +653,29 @@ export function EnrollmentForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>City/Municipality *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Antipolo City" {...field} />
-                      </FormControl>
+                      <Select
+                        value={selectedCity}
+                        onValueChange={(value) => {
+                          setSelectedCity(value)
+                          const city = cities.find(c => c.code === value)
+                          form.setValue('city', city?.name || '')
+                          form.setValue('barangay', '')
+                        }}
+                        disabled={!selectedProvince}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder={!selectedProvince ? "Select province first" : "Select city"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {cities.map((city) => (
+                            <SelectItem key={city.code} value={city.code}>
+                              {city.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -648,13 +685,40 @@ export function EnrollmentForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="province"
+                  name="barangay"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Province *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Rizal" {...field} />
-                      </FormControl>
+                      <FormLabel>Barangay *</FormLabel>
+                      {barangays.length > 0 ? (
+                        <Select
+                          value={barangays.find(b => b.name === field.value)?.code || ''}
+                          onValueChange={(value) => {
+                            const barangay = barangays.find(b => b.code === value)
+                            form.setValue('barangay', barangay?.name || '')
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select barangay" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {barangays.map((barangay) => (
+                              <SelectItem key={barangay.code} value={barangay.code}>
+                                {barangay.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder={!selectedCity ? "Select city first" : "Enter barangay"}
+                            disabled={!selectedCity}
+                          />
+                        </FormControl>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -699,7 +763,7 @@ export function EnrollmentForm() {
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Academic Information</h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                 <FormField
                   control={form.control}
                   name="gradeLevel"
@@ -711,7 +775,7 @@ export function EnrollmentForm() {
                         defaultValue={field.value}
                       >
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select grade level" />
                           </SelectTrigger>
                         </FormControl>
@@ -734,12 +798,38 @@ export function EnrollmentForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Section</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g., Enthusiasm, Obedience"
-                          {...field}
-                        />
-                      </FormControl>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={!selectedGradeLevel || loadingSections}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue
+                              placeholder={
+                                !selectedGradeLevel
+                                  ? "Select grade level first"
+                                  : loadingSections
+                                  ? "Loading sections..."
+                                  : sections.length === 0
+                                  ? "No sections available"
+                                  : "Select section"
+                              }
+                            />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {sections.map((section: any) => (
+                            <SelectItem key={section.id} value={section.id}>
+                              {section.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        {!selectedGradeLevel && "Please select a grade level to view available sections"}
+                        {selectedGradeLevel && sections.length === 0 && !loadingSections && "No sections configured for this grade level"}
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -792,7 +882,10 @@ export function EnrollmentForm() {
                   <FormItem>
                     <FormLabel>Remarks</FormLabel>
                     <FormControl>
-                      <Input placeholder="Optional remarks" {...field} />
+                      <StudentRemarksField
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -803,9 +896,9 @@ export function EnrollmentForm() {
             <Button
               type="submit"
               className="w-full"
-              disabled={createStudent.isPending}
+              disabled={createMutation.isPending}
             >
-              {createStudent.isPending ? 'Enrolling...' : 'Enroll Student'}
+              {createMutation.isPending ? 'Enrolling...' : 'Enroll Student'}
             </Button>
           </form>
         </Form>

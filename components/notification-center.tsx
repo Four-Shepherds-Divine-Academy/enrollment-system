@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,9 +10,22 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Bell, Check, Eye, EyeOff, X, UserPlus, Settings, AlertTriangle, Megaphone } from 'lucide-react'
-import { toast } from 'sonner'
+import {
+  DropdownMenu as DropdownMenuNested,
+  DropdownMenuContent as DropdownMenuContentNested,
+  DropdownMenuItem,
+  DropdownMenuTrigger as DropdownMenuTriggerNested,
+} from '@/components/ui/dropdown-menu'
+import { Bell, Check, Eye, EyeOff, X, UserPlus, Settings, AlertTriangle, Megaphone, MoreVertical } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import { useNotificationsStore } from '@/store/notifications-store'
+import {
+  useNotifications,
+  useUnreadNotificationsCount,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+  useDeleteNotification,
+} from '@/hooks/use-notifications'
 
 type NotificationType = 'ENROLLMENT' | 'SYSTEM' | 'ALERT'
 
@@ -24,7 +37,7 @@ type Notification = {
   isRead: boolean
   studentId: string | null
   enrollmentId: string | null
-  createdAt: string
+  createdAt: Date
   student?: {
     id: string
     fullName: string
@@ -35,96 +48,112 @@ type Notification = {
 }
 
 export function NotificationCenter() {
-  const queryClient = useQueryClient()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'all' | NotificationType>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'read'>('all')
 
-  const { data: notifications = [], isLoading } = useQuery<Notification[]>({
-    queryKey: ['notifications'],
-    queryFn: async () => {
-      const response = await fetch('/api/notifications')
-      if (!response.ok) throw new Error('Failed to fetch notifications')
-      return response.json()
-    },
-    refetchInterval: 30000, // Refetch every 30 seconds
+  // React Query hooks - filter based on tab
+  const readFilter = activeTab === 'unread' ? 'false' : activeTab === 'read' ? 'true' : undefined
+  const { data: notifications = [], isLoading } = useNotifications({
+    read: readFilter,
   })
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount()
+  const toggleReadMutation = useMarkNotificationRead()
+  const markAllReadMutation = useMarkAllNotificationsRead()
+  const deleteNotificationMutation = useDeleteNotification()
 
-  const toggleReadMutation = useMutation({
-    mutationFn: async ({ id, isRead }: { id: string; isRead: boolean }) => {
-      const response = await fetch(`/api/notifications/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isRead }),
-      })
-      if (!response.ok) throw new Error('Failed to update notification')
-      return response.json()
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    },
-  })
+  const handleNotificationClick = (notification: Notification) => {
+    // Mark as read if unread
+    if (!notification.isRead) {
+      toggleReadMutation.mutate(notification.id)
+    }
 
-  const markAllReadMutation = useMutation({
-    mutationFn: async (type?: NotificationType) => {
-      const url = type
-        ? `/api/notifications/mark-all-read?type=${type}`
-        : '/api/notifications/mark-all-read'
-      const response = await fetch(url, { method: 'POST' })
-      if (!response.ok) throw new Error('Failed to mark all as read')
-      return response.json()
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
-      toast.success('All notifications marked as read')
-    },
-  })
+    // Navigate to student page if student exists
+    if (notification.studentId) {
+      router.push(`/admin/dashboard/students/${notification.studentId}/edit`)
+      setOpen(false)
+    }
+  }
 
-  const deleteNotificationMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/notifications/${id}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) throw new Error('Failed to delete notification')
-      return response.json()
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
-      toast.success('Notification deleted')
-    },
-  })
-
-  const filteredNotifications =
-    activeTab === 'all'
-      ? notifications
-      : notifications.filter((n) => n.type === activeTab)
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length
-
-  const handleToggleRead = (id: string, currentIsRead: boolean) => {
-    toggleReadMutation.mutate({ id, isRead: !currentIsRead })
+  const handleToggleRead = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    toggleReadMutation.mutate(id)
   }
 
   const handleMarkAllRead = () => {
-    const type = activeTab === 'all' ? undefined : activeTab
-    markAllReadMutation.mutate(type)
+    markAllReadMutation.mutate()
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
     deleteNotificationMutation.mutate(id)
+  }
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as 'all' | 'unread' | 'read')
   }
 
   const getNotificationIcon = (type: NotificationType) => {
     switch (type) {
       case 'ENROLLMENT':
-        return <UserPlus className="h-5 w-5 text-blue-600" />
+        return <UserPlus className="h-4 w-4 text-blue-600" />
       case 'SYSTEM':
-        return <Settings className="h-5 w-5 text-gray-600" />
+        return <Settings className="h-4 w-4 text-gray-600" />
       case 'ALERT':
-        return <AlertTriangle className="h-5 w-5 text-orange-600" />
+        return <AlertTriangle className="h-4 w-4 text-orange-600" />
       default:
-        return <Megaphone className="h-5 w-5 text-purple-600" />
+        return <Megaphone className="h-4 w-4 text-purple-600" />
     }
   }
+
+  const getNotificationBadge = (notification: Notification) => {
+    const { type, student } = notification
+
+    if (type === 'ENROLLMENT' && student) {
+      const status = student.enrollmentStatus
+
+      if (status === 'PENDING') {
+        return (
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-yellow-50 text-yellow-700 border-yellow-300">
+            Pending
+          </Badge>
+        )
+      } else if (status === 'ENROLLED') {
+        return (
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-green-50 text-green-700 border-green-300">
+            Enrolled
+          </Badge>
+        )
+      } else if (status === 'DROPPED') {
+        return (
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-red-50 text-red-700 border-red-300">
+            Dropped
+          </Badge>
+        )
+      }
+    }
+
+    if (type === 'SYSTEM') {
+      return (
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-gray-50 text-gray-700 border-gray-300">
+          System
+        </Badge>
+      )
+    }
+
+    if (type === 'ALERT') {
+      return (
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-orange-50 text-orange-700 border-orange-300">
+          Alert
+        </Badge>
+      )
+    }
+
+    return null
+  }
+
+  const unreadNotifications = notifications.filter(n => !n.isRead)
+  const readNotifications = notifications.filter(n => n.isRead)
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -157,21 +186,29 @@ export function NotificationCenter() {
           )}
         </div>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="w-full rounded-none border-b">
             <TabsTrigger value="all" className="flex-1">
               All
+              {notifications.length > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
+                  {notifications.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="unread" className="flex-1">
+              Unread
               {unreadCount > 0 && (
                 <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
                   {unreadCount}
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="ENROLLMENT" className="flex-1">
-              Enrollment
-              {notifications.filter((n) => n.type === 'ENROLLMENT' && !n.isRead).length > 0 && (
+            <TabsTrigger value="read" className="flex-1">
+              Read
+              {readNotifications.length > 0 && activeTab === 'read' && (
                 <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
-                  {notifications.filter((n) => n.type === 'ENROLLMENT' && !n.isRead).length}
+                  {readNotifications.length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -181,68 +218,83 @@ export function NotificationCenter() {
             <div className="max-h-[400px] overflow-y-auto">
               {isLoading ? (
                 <div className="p-8 text-center text-gray-500">Loading notifications...</div>
-              ) : filteredNotifications.length === 0 ? (
+              ) : notifications.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">
                   <Bell className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>No notifications</p>
                 </div>
               ) : (
-                filteredNotifications.map((notification) => (
+                notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 border-b hover:bg-gray-50 transition-colors ${
-                      !notification.isRead ? 'bg-blue-50' : ''
+                    className={`px-4 py-2.5 border-b hover:bg-gray-50 transition-colors cursor-pointer ${
+                      !notification.isRead ? 'bg-blue-50/50' : ''
                     }`}
+                    onClick={() => handleNotificationClick(notification)}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-2.5">
                       <div className="flex-shrink-0 mt-1">
-                        {getNotificationIcon(notification.type)}
+                        <div className="p-1.5 rounded-full bg-blue-50">
+                          {getNotificationIcon(notification.type)}
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-medium text-sm">{notification.title}</h4>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() =>
-                                handleToggleRead(notification.id, notification.isRead)
-                              }
-                              title={notification.isRead ? 'Mark as unread' : 'Mark as read'}
-                            >
-                              {notification.isRead ? (
-                                <EyeOff className="h-3.5 w-3.5" />
-                              ) : (
-                                <Eye className="h-3.5 w-3.5" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-medium text-sm text-gray-900">{notification.title}</h4>
+                              {getNotificationBadge(notification)}
+                              {!notification.isRead && (
+                                <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
                               )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => handleDelete(notification.id)}
-                              title="Delete notification"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
-                        {notification.student && (
-                          <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
-                            <div className="font-medium">{notification.student.fullName}</div>
-                            <div className="text-gray-600">
-                              {notification.student.gradeLevel}
-                              {notification.student.lrn && ` • LRN: ${notification.student.lrn}`}
                             </div>
+                            {notification.student && (
+                              <p className="text-sm text-gray-700 mt-1">
+                                {notification.student.fullName} • {notification.student.gradeLevel}
+                                {notification.student.lrn && ` • ${notification.student.lrn}`}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-1">
+                              {formatDistanceToNow(new Date(notification.createdAt), {
+                                addSuffix: true,
+                              })}
+                            </p>
                           </div>
-                        )}
-                        <p className="text-xs text-gray-400 mt-2">
-                          {formatDistanceToNow(new Date(notification.createdAt), {
-                            addSuffix: true,
-                          })}
-                        </p>
+                          <DropdownMenuNested>
+                            <DropdownMenuTriggerNested asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 -mt-1 text-gray-400 hover:text-gray-600"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTriggerNested>
+                            <DropdownMenuContentNested align="end" className="w-40">
+                              <DropdownMenuItem onClick={(e) => handleToggleRead(e, notification.id)}>
+                                {notification.isRead ? (
+                                  <>
+                                    <EyeOff className="h-4 w-4 mr-2" />
+                                    Mark as unread
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    Mark as read
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => handleDelete(e, notification.id)}
+                                className="text-red-600 focus:text-red-600"
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContentNested>
+                          </DropdownMenuNested>
+                        </div>
                       </div>
                     </div>
                   </div>

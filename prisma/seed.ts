@@ -2,6 +2,7 @@ import type { PrismaClient as PrismaClientType } from '@prisma/client'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { execSync } from 'child_process'
+import { createSections } from './seed-helpers'
 
 const prisma: PrismaClientType = new PrismaClient()
 
@@ -24,6 +25,10 @@ async function main(): Promise<void> {
 
   console.log('Admin user created:', { email: admin.email, name: admin.name })
   console.log('Password: admin123')
+
+  // Create all sections
+  console.log('\nCreating sections...')
+  await createSections(prisma)
 
   // Run individual seed files for academic years
   console.log('\nSeeding 2023-2024 academic year...')

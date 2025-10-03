@@ -13,6 +13,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const gradeLevel = searchParams.get('gradeLevel')
     const status = searchParams.get('status')
     const search = searchParams.get('search')
+    const remark = searchParams.get('remark')
     const academicYear = searchParams.get('academicYear')
 
     const where: Prisma.StudentWhereInput = {}
@@ -25,6 +26,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Status filter
     if (status && status !== 'All Status') {
       where.enrollmentStatus = status
+    }
+
+    // Remark filter (searches in remarks field)
+    if (remark && remark !== 'All Remarks') {
+      where.remarks = {
+        contains: remark,
+        mode: 'insensitive',
+      }
     }
 
     // Search filter (name, LRN, city)
@@ -47,12 +56,42 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const students = await prisma.student.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        lrn: true,
+        fullName: true,
+        gradeLevel: true,
+        contactNumber: true,
+        city: true,
+        province: true,
+        enrollmentStatus: true,
+        isTransferee: true,
+        previousSchool: true,
+        gender: true,
+        houseNumber: true,
+        street: true,
+        subdivision: true,
+        barangay: true,
+        parentGuardian: true,
+        remarks: true,
+        section: {
+          select: {
+            id: true,
+            name: true,
+            gradeLevel: true,
+          },
+        },
         enrollments: {
           select: {
             schoolYear: true,
             gradeLevel: true,
-            section: true,
+            section: {
+              select: {
+                id: true,
+                name: true,
+                gradeLevel: true,
+              },
+            },
             status: true,
             enrollmentDate: true,
           },
@@ -82,6 +121,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const body = await request.json()
     const validatedData = studentSchema.parse(body)
 
+    // Normalize LRN - convert empty string to null
+    const normalizedLrn = validatedData.lrn && validatedData.lrn.trim() !== ''
+      ? validatedData.lrn.trim()
+      : null
+
     // Create full name
     const fullName = [
       validatedData.firstName,
@@ -95,10 +139,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let student
     let existingStudent = null
 
-    // First try to find by LRN
-    if (validatedData.lrn) {
+    // First try to find by LRN (only if LRN is provided)
+    if (normalizedLrn) {
       existingStudent = await prisma.student.findUnique({
-        where: { lrn: validatedData.lrn },
+        where: { lrn: normalizedLrn },
       })
     }
 
@@ -128,12 +172,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (existingStudent) {
       // Update existing student record
+      const { section, ...studentData } = validatedData
       student = await prisma.student.update({
         where: { id: existingStudent.id },
         data: {
-          ...validatedData,
+          ...studentData,
+          lrn: normalizedLrn,
           fullName,
           dateOfBirth: new Date(validatedData.dateOfBirth),
+          sectionId: section || null,
+          enrollmentStatus: 'PENDING', // Update student enrollment status to PENDING for re-enrollment
         },
       })
 
@@ -144,43 +192,44 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           academicYearId: activeYear.id,
           schoolYear: activeYear.name,
           gradeLevel: validatedData.gradeLevel,
-          section: validatedData.section,
-          status: 'ENROLLED',
+          sectionId: section || null,
+          status: 'PENDING', // Set enrollment status to PENDING
         },
       })
 
       // Create notification for pending students (re-enrollment)
-      if (student.enrollmentStatus === 'PENDING') {
-        try {
-          const session = await auth()
+      try {
+        const session = await auth()
+        const adminId = session?.user?.id || session?.user?.email || 'system'
 
-          if (session?.user?.id) {
-            await prisma.notification.create({
-              data: {
-                adminId: session.user.id,
-                type: 'ENROLLMENT',
-                title: 'Re-enrollment Pending',
-                message: `${student.fullName} has been re-enrolled in ${student.gradeLevel} and is awaiting approval.`,
-                studentId: student.id,
-                enrollmentId: enrollment.id,
-              },
-            })
-          }
-        } catch (notifError) {
-          // Don't fail the enrollment if notification creation fails
-          console.error('Failed to create notification:', notifError)
-        }
+        await prisma.notification.create({
+          data: {
+            adminId: adminId,
+            type: 'ENROLLMENT',
+            title: 'Re-enrollment Pending',
+            message: `${student.fullName} has been re-enrolled in ${student.gradeLevel} and is awaiting approval.`,
+            studentId: student.id,
+            enrollmentId: enrollment.id,
+          },
+        })
+      } catch (notifError) {
+        // Don't fail the enrollment if notification creation fails
+        console.error('Failed to create notification:', notifError)
       }
 
       return NextResponse.json({ ...student, isReenrollment: true }, { status: 200 })
     }
 
     // Create new student if not exists
+    const { section, ...studentData } = validatedData
     student = await prisma.student.create({
       data: {
-        ...validatedData,
+        ...studentData,
+        lrn: normalizedLrn,
         fullName,
         dateOfBirth: new Date(validatedData.dateOfBirth),
+        sectionId: section || null,
+        enrollmentStatus: 'PENDING', // Set initial enrollment status to PENDING
       },
     })
 
@@ -191,32 +240,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         academicYearId: activeYear.id,
         schoolYear: activeYear.name,
         gradeLevel: validatedData.gradeLevel,
-        section: validatedData.section,
-        status: 'ENROLLED',
+        sectionId: section || null,
+        status: 'PENDING', // Set enrollment status to PENDING
       },
     })
 
     // Create notification for pending students
-    if (student.enrollmentStatus === 'PENDING') {
-      try {
-        const session = await auth()
+    try {
+      const session = await auth()
+      const adminId = session?.user?.id || session?.user?.email || 'system'
 
-        if (session?.user?.id) {
-          await prisma.notification.create({
-            data: {
-              adminId: session.user.id,
-              type: 'ENROLLMENT',
-              title: 'New Pending Enrollment',
-              message: `${student.fullName} has been enrolled in ${student.gradeLevel} and is awaiting approval.`,
-              studentId: student.id,
-              enrollmentId: enrollment.id,
-            },
-          })
-        }
-      } catch (notifError) {
-        // Don't fail the enrollment if notification creation fails
-        console.error('Failed to create notification:', notifError)
-      }
+      await prisma.notification.create({
+        data: {
+          adminId: adminId,
+          type: 'ENROLLMENT',
+          title: 'New Pending Enrollment',
+          message: `${student.fullName} has been enrolled in ${student.gradeLevel} and is awaiting approval.`,
+          studentId: student.id,
+          enrollmentId: enrollment.id,
+        },
+      })
+    } catch (notifError) {
+      // Don't fail the enrollment if notification creation fails
+      console.error('Failed to create notification:', notifError)
     }
 
     return NextResponse.json({ ...student, isReenrollment: false }, { status: 201 })
@@ -226,6 +272,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { error: 'Validation failed', details: error.errors },
         { status: 400 }
       )
+    }
+
+    // Handle Prisma unique constraint errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      if (error.code === 'P2002') {
+        const meta = 'meta' in error ? error.meta as any : null
+        const fields = meta?.target || []
+
+        if (fields.includes('lrn')) {
+          return NextResponse.json(
+            { error: 'A student with this LRN already exists. Please check the LRN or use a different one.' },
+            { status: 409 }
+          )
+        }
+
+        return NextResponse.json(
+          { error: 'A student with this information already exists.' },
+          { status: 409 }
+        )
+      }
     }
 
     console.error('Error creating student:', error)
