@@ -434,10 +434,17 @@ export default function SectionsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the section &quot;{deletingSection?.name}&quot;
-              for {deletingSection?.gradeLevel}. This action cannot be undone.
+            <AlertDialogTitle>Delete Section</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p>
+                  Are you sure you want to delete the section &quot;{deletingSection?.name}&quot;
+                  for {deletingSection?.gradeLevel}?
+                </p>
+                <p className="mt-2">
+                  If you change your mind, you can restore this section within 30 days by going to the Recycle Bin.
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

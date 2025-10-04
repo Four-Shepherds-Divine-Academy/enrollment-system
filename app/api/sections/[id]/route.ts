@@ -106,7 +106,7 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/sections/[id] - Delete a section
+// DELETE /api/sections/[id] - Soft delete a section (move to recycle bin)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -139,6 +139,21 @@ export async function DELETE(
         { status: 400 }
       );
     }
+
+    // Create snapshot for recycle bin
+    const now = new Date();
+    const permanentDeleteAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+    await prisma.recycleBin.create({
+      data: {
+        entityType: 'section',
+        entityId: params.id,
+        entityData: section,
+        entityName: `${section.name} - ${section.gradeLevel}`,
+        deletedBy: session.user?.email || session.user?.id,
+        permanentDeleteAt,
+      },
+    });
 
     await prisma.section.delete({
       where: { id: params.id },

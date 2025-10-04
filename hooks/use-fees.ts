@@ -21,11 +21,14 @@ export function useFeeTemplates(filters: {
       if (filters.search) params.append('search', filters.search)
       if (filters.category) params.append('category', filters.category)
 
-      const response = await fetch(`/api/fees/templates?${params.toString()}`)
+      const response = await fetch(`/api/fees/templates?${params.toString()}`, {
+        cache: 'no-store', // Don't cache API responses
+      })
       if (!response.ok) throw new Error('Failed to fetch fee templates')
       return response.json()
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0, // Always consider data stale
+    refetchOnMount: true, // Refetch when component mounts
     refetchOnWindowFocus: true,
     placeholderData: (previousData) => previousData,
   })
@@ -35,12 +38,16 @@ export function useFeeTemplate(id: string) {
   return useQuery({
     queryKey: [FEES_QUERY_KEY, 'templates', id],
     queryFn: async () => {
-      const response = await fetch(`/api/fees/templates/${id}`)
+      const response = await fetch(`/api/fees/templates/${id}`, {
+        cache: 'no-store',
+      })
       if (!response.ok) throw new Error('Failed to fetch fee template')
       return response.json()
     },
     enabled: !!id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -153,13 +160,17 @@ export function useStudentFeeStatus(
       if (filters?.dateTo) params.append('dateTo', filters.dateTo)
 
       const response = await fetch(
-        `/api/students/${studentId}/fee-status?${params.toString()}`
+        `/api/students/${studentId}/fee-status?${params.toString()}`,
+        {
+          cache: 'no-store',
+        }
       )
       if (!response.ok) throw new Error('Failed to fetch fee status')
       return response.json()
     },
     enabled: !!studentId && !!academicYearId,
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    refetchOnMount: true,
     refetchOnWindowFocus: true,
     placeholderData: (previousData) => previousData,
   })

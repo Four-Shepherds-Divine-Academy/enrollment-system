@@ -839,9 +839,15 @@ export default function FeesManagementPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Fee Template?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the fee template "{templateToDelete?.name}".
-              This action cannot be undone.
+            <AlertDialogDescription asChild>
+              <div>
+                <p>
+                  Are you sure you want to delete the fee template "{templateToDelete?.name}"?
+                </p>
+                <p className="mt-2">
+                  If you change your mind, you can restore this template within 30 days by going to the Recycle Bin.
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -91,7 +91,7 @@ export async function POST(
                 schoolYear: targetYear.name,
                 gradeLevel: importStudent.gradeLevel,
                 sectionId: null, // Section will be assigned later
-                status: 'ENROLLED',
+                status: 'PENDING', // Imported students default to PENDING status
               },
             })
 
@@ -101,7 +101,7 @@ export async function POST(
               data: {
                 gradeLevel: importStudent.gradeLevel,
                 sectionId: null,
-                enrollmentStatus: 'ENROLLED',
+                enrollmentStatus: 'PENDING', // Imported students default to PENDING status
               },
             })
 

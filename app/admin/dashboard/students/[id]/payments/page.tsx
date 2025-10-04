@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -508,6 +509,12 @@ export default function StudentPaymentsPage() {
     )
   }
 
+  // Check if student is not enrolled (check this FIRST)
+  const isNotEnrolled = student?.enrollmentStatus !== 'ENROLLED'
+
+  // Check if fee template exists (but only show this alert if student IS enrolled)
+  const hasNoFeeTemplate = !feeStatus?.feeTemplate && !isNotEnrolled
+
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
@@ -528,6 +535,47 @@ export default function StudentPaymentsPage() {
             {student?.fullName} • {activeYear.name}
           </p>
         </div>
+
+        {/* No Fee Template Warning */}
+        {hasNoFeeTemplate && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-2">
+                <p>
+                  <span className="font-medium">No Fee Template Available:</span> There is no fee template configured for {student?.gradeLevel}. Payments cannot be processed until a template is created.
+                </p>
+                <Link href="/admin/dashboard/fees">
+                  <Button size="sm" variant="outline" className="mt-1">
+                    Create Fee Template
+                  </Button>
+                </Link>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Student Not Enrolled Warning */}
+        {isNotEnrolled && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-2">
+                <p>
+                  <span className="font-medium">Student Not Enrolled:</span> {student?.fullName} has a status of <Badge variant="outline" className="ml-1">{student?.enrollmentStatus}</Badge>. Payments can only be processed for enrolled students.
+                </p>
+                <p className="text-sm">
+                  Please enroll this student first before creating payments.
+                </p>
+                <Link href={`/admin/dashboard/students/${studentId}/edit`}>
+                  <Button size="sm" variant="outline" className="mt-1">
+                    Enroll Student
+                  </Button>
+                </Link>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Late Payment Warning */}
         {feeStatus?.isLatePayment && (
@@ -651,6 +699,7 @@ export default function StudentPaymentsPage() {
               setPaymentError('')
             }}
             className="w-full"
+            disabled={isNotEnrolled || hasNoFeeTemplate}
           >
             <DollarSign className="h-4 w-4 mr-2" />
             Record Payment
@@ -658,7 +707,7 @@ export default function StudentPaymentsPage() {
           <Button
             onClick={handlePayFullBalance}
             variant="outline"
-            disabled={!feeStatus?.balance || feeStatus.balance <= 0}
+            disabled={isNotEnrolled || hasNoFeeTemplate || !feeStatus?.balance || feeStatus.balance <= 0}
             className="w-full"
           >
             Pay Full Balance
@@ -670,6 +719,7 @@ export default function StudentPaymentsPage() {
             }}
             variant="outline"
             className="w-full"
+            disabled={isNotEnrolled || hasNoFeeTemplate}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Adjustment
@@ -677,7 +727,7 @@ export default function StudentPaymentsPage() {
           <Button
             onClick={handleToggleLatePayment}
             variant={feeStatus?.isLatePayment ? 'destructive' : 'outline'}
-            disabled={updateLateMutation.isPending}
+            disabled={isNotEnrolled || hasNoFeeTemplate || updateLateMutation.isPending}
             className="w-full"
           >
             {updateLateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -698,6 +748,7 @@ export default function StudentPaymentsPage() {
                 variant="outline"
                 size="sm"
                 className="gap-2"
+                disabled={!feeStatus?.payments || feeStatus.payments.length === 0}
               >
                 <FileDown className="h-4 w-4" />
                 Export to PDF
@@ -1261,13 +1312,34 @@ export default function StudentPaymentsPage() {
                 </div>
               )}
 
-              {/* Fully Paid Notice */}
-              {feeStatus && feeStatus.balance <= 0 && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                  <p className="text-sm font-medium text-green-800">
-                    This student has fully paid all fees. No additional payments are needed.
-                  </p>
-                </div>
+              {/* No Fee Template Notice */}
+              {hasNoFeeTemplate ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="space-y-3">
+                    <p className="font-semibold">No Fee Template Available for {student?.gradeLevel}</p>
+                    <p className="text-sm">
+                      There is no payment reference to be made for {student?.fullName}.
+                      A fee template must be created for {student?.gradeLevel} before payments can be processed.
+                    </p>
+                    <div className="pt-2">
+                      <Link href="/admin/dashboard/fees">
+                        <Button size="sm" variant="outline">
+                          Create Fee Template for {student?.gradeLevel}
+                        </Button>
+                      </Link>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                /* Fully Paid Notice */
+                feeStatus && feeStatus.balance <= 0 && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                    <p className="text-sm font-medium text-green-800">
+                      This student has fully paid all fees. No additional payments are needed.
+                    </p>
+                  </div>
+                )
               )}
 
               {/* Manual Amount (only if no line items selected and balance > 0) */}

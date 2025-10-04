@@ -544,18 +544,15 @@ export default function AcademicYearsPage() {
             <AlertDialogTitle>Delete Academic Year?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
-                <div className="font-semibold text-red-600">
-                  ⚠️ This action cannot be undone!
-                </div>
                 <div className="mt-2">
                   Are you sure you want to delete <strong>"{pendingActionYear?.name}"</strong>?
                 </div>
                 <div className="mt-2">
-                  This will permanently delete the academic year and all related enrollments
+                  This will delete the academic year and all related enrollments
                   ({pendingActionYear?._count?.enrollments || 0} enrollment records).
                 </div>
-                <div className="mt-2 text-sm text-muted-foreground">
-                  Note: This is intended for testing purposes only.
+                <div className="mt-2">
+                  If you change your mind, you can restore this academic year within 30 days by going to the Recycle Bin.
                 </div>
               </div>
             </AlertDialogDescription>

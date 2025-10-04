@@ -61,31 +61,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Student not found' }, { status: 404 })
     }
 
-    // Only allow editing if student has enrollment in active year
+    const body = await request.json()
+    const validatedData = studentSchema.parse(body)
+
+    // Get active academic year for enrollment updates
     const activeYear = await prisma.academicYear.findFirst({
       where: { isActive: true },
     })
-
-    if (!activeYear) {
-      return NextResponse.json(
-        { error: 'No active academic year found' },
-        { status: 400 }
-      )
-    }
-
-    const hasActiveEnrollment = existingStudent.enrollments.some(
-      (enrollment) => enrollment.academicYearId === activeYear.id
-    )
-
-    if (!hasActiveEnrollment) {
-      return NextResponse.json(
-        { error: 'Cannot edit student not enrolled in current academic year' },
-        { status: 403 }
-      )
-    }
-
-    const body = await request.json()
-    const validatedData = studentSchema.parse(body)
 
     // Normalize LRN - convert empty string to null
     const normalizedLrn = validatedData.lrn && validatedData.lrn.trim() !== ''
@@ -132,18 +114,20 @@ export async function PUT(
       },
     })
 
-    // Update enrollment record for current year
-    await prisma.enrollment.updateMany({
-      where: {
-        studentId: student.id,
-        academicYearId: activeYear.id,
-      },
-      data: {
-        gradeLevel: validatedData.gradeLevel,
-        sectionId: section || null,
-        ...(enrollmentStatus && { status: enrollmentStatus }),
-      },
-    })
+    // Update enrollment record for current year (if active year exists)
+    if (activeYear) {
+      await prisma.enrollment.updateMany({
+        where: {
+          studentId: student.id,
+          academicYearId: activeYear.id,
+        },
+        data: {
+          gradeLevel: validatedData.gradeLevel,
+          sectionId: section || null,
+          ...(enrollmentStatus && { status: enrollmentStatus }),
+        },
+      })
+    }
 
     // Handle notification cleanup when status changes
     if (enrollmentStatus && existingStudent.enrollmentStatus !== enrollmentStatus) {
@@ -214,12 +198,17 @@ export async function PUT(
   }
 }
 
-// DELETE student
+// DELETE student - Soft delete (move to recycle bin)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
     // Check if student exists
     const existingStudent = await prisma.student.findUnique({
@@ -237,7 +226,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Student not found' }, { status: 404 })
     }
 
-    // Check if student has enrollment in active year only
+    // Check if student has enrollment in active year
     const activeYear = await prisma.academicYear.findFirst({
       where: { isActive: true },
     })
@@ -260,20 +249,24 @@ export async function DELETE(
       )
     }
 
-    // Check if student has enrollments in inactive years
-    const hasClosedYearEnrollment = existingStudent.enrollments.some(
-      (enrollment) => !enrollment.academicYear.isActive
-    )
+    // Note: Historical enrollment data will be preserved in the recycle bin
+    // Students can be deleted even if they have enrollments in closed years,
+    // as long as they are enrolled in the current active year
 
-    if (hasClosedYearEnrollment) {
-      return NextResponse.json(
-        {
-          error:
-            'Cannot delete student with enrollments in closed academic years',
-        },
-        { status: 403 }
-      )
-    }
+    // Create snapshot for recycle bin
+    const now = new Date()
+    const permanentDeleteAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
+    await prisma.recycleBin.create({
+      data: {
+        entityType: 'student',
+        entityId: id,
+        entityData: existingStudent,
+        entityName: existingStudent.fullName,
+        deletedBy: session.user.email || session.user.id,
+        permanentDeleteAt,
+      },
+    })
 
     // Delete related notifications
     await prisma.notification.deleteMany({

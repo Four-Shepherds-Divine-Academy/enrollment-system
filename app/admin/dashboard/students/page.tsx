@@ -826,10 +826,16 @@ export default function StudentsListPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete {studentToDelete?.fullName}. This action cannot be
-              undone.
+            <AlertDialogTitle>Delete Student</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p>
+                  Are you sure you want to delete {studentToDelete?.fullName}?
+                </p>
+                <p className="mt-2">
+                  If you change your mind, you can restore this student within 30 days by going to the Recycle Bin.
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

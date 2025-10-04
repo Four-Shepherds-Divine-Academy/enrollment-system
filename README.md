@@ -34,3 +34,28 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+### Vercel Cron Job Setup
+
+This application uses Vercel Cron Jobs for automatic recycle bin cleanup (items are permanently deleted after 30 days).
+
+**Required Environment Variable:**
+
+After deploying to Vercel, add the `CRON_SECRET` environment variable:
+
+1. Go to your Vercel project dashboard
+2. Navigate to **Settings** → **Environment Variables**
+3. Add a new variable:
+   - **Name:** `CRON_SECRET`
+   - **Value:** Generate a strong secret using: `openssl rand -base64 32`
+   - **Environments:** Production, Preview, Development
+
+4. Redeploy your application for the changes to take effect
+
+**Cron Schedule:**
+- The cleanup job runs **daily at midnight UTC** (00:00)
+- Configured in `vercel.json` with schedule: `"0 0 * * *"`
+- Endpoint: `/api/cron/cleanup-recycle-bin`
+
+**Manual Cleanup:**
+Admins can also manually trigger cleanup from the Recycle Bin page using the "Cleanup Expired Items" button.

@@ -180,7 +180,7 @@ export async function POST(
   }
 }
 
-// DELETE academic year and all related records (testing only)
+// DELETE academic year - Soft delete (move to recycle bin)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -208,15 +208,26 @@ export async function DELETE(
 
     console.log(`Found academic year: ${academicYear.name} with ${academicYear._count.enrollments} enrollments`)
 
+    // Create snapshot for recycle bin
+    const now = new Date()
+    const permanentDeleteAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
+    await prisma.recycleBin.create({
+      data: {
+        entityType: 'academicYear',
+        entityId: id,
+        entityData: academicYear,
+        entityName: academicYear.name,
+        deletedBy: 'admin', // Could be enhanced to get actual user from session
+        permanentDeleteAt,
+      },
+    })
+
     // Delete all enrollments for this academic year (cascade should handle this, but being explicit)
     const deletedEnrollments = await prisma.enrollment.deleteMany({
       where: { academicYearId: id }
     })
     console.log(`Deleted ${deletedEnrollments.count} enrollments`)
-
-    // Delete all notifications related to this academic year's enrollments
-    // Note: Notifications are linked to students, not directly to academic years
-    // But we can clean up orphaned notifications if needed in the future
 
     // Delete the academic year itself
     await prisma.academicYear.delete({

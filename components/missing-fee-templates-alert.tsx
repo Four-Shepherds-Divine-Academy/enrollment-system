@@ -51,9 +51,26 @@ export function MissingFeeTemplatesAlert() {
     )
   }
 
-  // Don't show if no active year
+  // Show alert to set up academic year if none is active
   if (!activeYear) {
-    return null
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>No Active Academic Year</AlertTitle>
+        <AlertDescription className="mt-2 space-y-3">
+          <p className="text-sm">
+            Please set up an active academic year to continue.
+          </p>
+          <div>
+            <Link href="/admin/dashboard/academic-years">
+              <Button size="sm" variant="outline" className="h-8">
+                Set Up Academic Year
+              </Button>
+            </Link>
+          </div>
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   // Group templates by grade level

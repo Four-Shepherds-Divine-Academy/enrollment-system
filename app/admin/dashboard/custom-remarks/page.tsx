@@ -549,17 +549,24 @@ export default function CustomRemarksPage() {
                       {deleteConfirm.studentCount !== 1 ? 's' : ''} who currently have this remark.
                     </div>
                     <div>
-                      This will permanently remove the remark from all affected student records.{' '}
-                      <span className="font-semibold">This action cannot be undone.</span>
+                      This will remove the remark from all affected student records.
                     </div>
                     <div className="font-medium">
                       Are you sure you want to delete "{deleteConfirm?.label}"?
                     </div>
+                    <div className="text-sm">
+                      If you change your mind, you can restore this remark within 30 days by going to the Recycle Bin.
+                    </div>
                   </>
                 ) : (
-                  <div className="font-medium">
-                    Are you sure you want to delete "{deleteConfirm?.label}"? This action cannot be undone.
-                  </div>
+                  <>
+                    <div className="font-medium">
+                      Are you sure you want to delete "{deleteConfirm?.label}"?
+                    </div>
+                    <div className="text-sm">
+                      If you change your mind, you can restore this remark within 30 days by going to the Recycle Bin.
+                    </div>
+                  </>
                 )}
               </div>
             </AlertDialogDescription>
@@ -683,7 +690,7 @@ export default function CustomRemarksPage() {
                       <TableCell>{student.gradeLevel}</TableCell>
                       <TableCell>{student.section}</TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/admin/dashboard/students/${student.id}`}>
+                        <Link href={`/admin/dashboard/students/${student.id}/edit`}>
                           <Button variant="ghost" size="sm">
                             View
                           </Button>

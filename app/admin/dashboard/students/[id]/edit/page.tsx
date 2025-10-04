@@ -61,6 +61,7 @@ export default function EditStudentPage() {
     formState: { errors },
     setValue,
     watch,
+    reset,
   } = useForm<StudentFormData>({
     // @ts-expect-error - Type mismatch between duplicate react-hook-form types in node_modules
     resolver: zodResolver(studentSchema),
@@ -91,27 +92,41 @@ export default function EditStudentPage() {
   // Populate form when student data is loaded
   useEffect(() => {
     if (student) {
-      // Set basic fields first
-      Object.entries(student).forEach(([key, value]) => {
-        if (key === 'dateOfBirth') {
-          setValue(key as any, new Date(value).toISOString().split('T')[0])
-        } else if (key === 'section') {
-          // Skip section here, we'll handle it separately
-          return
-        } else if (key in studentSchema.shape) {
-          setValue(key as any, value ?? '')
-        }
-      })
+      // Prepare form data
+      const formData: Partial<StudentFormData> = {
+        lrn: student.lrn || '',
+        firstName: student.firstName || '',
+        middleName: student.middleName || '',
+        lastName: student.lastName || '',
+        gender: student.gender || '',
+        contactNumber: student.contactNumber || '',
+        dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth).toISOString().split('T')[0] : '',
+        houseNumber: student.houseNumber || '',
+        street: student.street || '',
+        subdivision: student.subdivision || '',
+        barangay: student.barangay || '',
+        city: student.city || '',
+        province: student.province || '',
+        zipCode: student.zipCode || '',
+        parentGuardian: student.parentGuardian || '',
+        gradeLevel: student.gradeLevel || '',
+        enrollmentStatus: student.enrollmentStatus || 'PENDING',
+        isTransferee: student.isTransferee || false,
+        previousSchool: student.previousSchool || '',
+        remarks: student.remarks || '',
+      }
 
-      // Handle section separately - set the section ID if it exists
+      // Handle section separately
       if (student.section && typeof student.section === 'object') {
-        const secId = student.section.id
-        setValue('section', secId)
-        setSectionValue(secId)
+        formData.section = student.section.id
+        setSectionValue(student.section.id)
       } else if (student.sectionId) {
-        setValue('section', student.sectionId)
+        formData.section = student.sectionId
         setSectionValue(student.sectionId)
       }
+
+      // Reset form with all data at once
+      reset(formData)
 
       // Initialize location dropdowns based on student data
       if (student.province) {
@@ -127,7 +142,7 @@ export default function EditStudentPage() {
         }
       }
     }
-  }, [student, setValue, provinces, cities, setSelectedProvince, setSelectedCity])
+  }, [student, reset, provinces, cities, setSelectedProvince, setSelectedCity])
 
   const onSubmit = (data: StudentFormData) => {
     updateMutation.mutate(

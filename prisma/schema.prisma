@@ -418,3 +418,22 @@ model CustomRemark {
   @@index([isActive])
 }
 
+model RecycleBin {
+  id                  String   @id @default(cuid())
+  entityType          String   // Type of entity: student, section, academicYear, feeTemplate, customRemark, etc.
+  entityId            String   // Original ID of the deleted entity
+  entityData          Json     // Complete snapshot of the deleted entity
+  entityName          String   // Display name for the entity (e.g., student name, section name)
+
+  deletedBy           String?  // Admin who deleted it
+  deletedAt           DateTime @default(now())
+  permanentDeleteAt   DateTime // When it will be permanently deleted (30 days from deletedAt)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([entityType])
+  @@index([deletedAt])
+  @@index([permanentDeleteAt])
+}
+

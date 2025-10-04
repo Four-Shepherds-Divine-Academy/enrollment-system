@@ -77,7 +77,7 @@ export async function PATCH(
   }
 }
 
-// DELETE custom remark
+// DELETE custom remark - Soft delete (move to recycle bin)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -101,6 +101,21 @@ export async function DELETE(
         { status: 404 }
       )
     }
+
+    // Create snapshot for recycle bin
+    const now = new Date()
+    const permanentDeleteAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
+    await prisma.recycleBin.create({
+      data: {
+        entityType: 'customRemark',
+        entityId: id,
+        entityData: existing,
+        entityName: `${existing.label} (${existing.category})`,
+        deletedBy: session.user.email || session.user.id,
+        permanentDeleteAt,
+      },
+    })
 
     await prisma.customRemark.delete({
       where: { id },

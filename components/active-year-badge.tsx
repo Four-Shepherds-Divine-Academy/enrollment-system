@@ -1,11 +1,26 @@
 'use client'
 
+import Link from 'next/link'
 import { useActiveAcademicYear } from '@/hooks/use-academic-years'
 
 export function ActiveYearBadge() {
   const { data: activeYear } = useActiveAcademicYear()
 
-  if (!activeYear) return null
+  if (!activeYear) {
+    return (
+      <Link href="/admin/dashboard/academic-years">
+        <div className="hidden sm:flex items-center px-3 py-1.5 bg-gradient-to-r from-red-50 to-orange-50 border border-red-300 rounded-lg cursor-pointer hover:bg-red-100 transition-colors">
+          <span className="text-xs font-semibold text-red-700 mr-1">
+            WARNING:
+          </span>
+          <span className="text-sm font-bold text-red-900">
+            No Academic Year Selected
+          </span>
+          <div className="ml-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+        </div>
+      </Link>
+    )
+  }
 
   return (
     <div className="hidden sm:flex items-center px-3 py-1.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg">

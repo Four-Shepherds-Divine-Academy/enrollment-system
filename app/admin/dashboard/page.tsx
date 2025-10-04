@@ -13,6 +13,10 @@ import {
 } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 
+// Force dynamic rendering - always fetch fresh data
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function AdminDashboardPage() {
   // Get active academic year
   const activeYear = await prisma.academicYear.findFirst({

@@ -26,7 +26,8 @@ import {
   LayoutGrid,
   DollarSign,
   Receipt,
-  MessageSquare
+  MessageSquare,
+  Trash2
 } from 'lucide-react'
 import { NotificationCenter } from '@/components/notification-center'
 import { ActiveYearBadge } from '@/components/active-year-badge'
@@ -141,6 +142,12 @@ export default async function AdminLayout({
                     <Link href="/admin/dashboard/custom-remarks" className="flex items-center cursor-pointer">
                       <MessageSquare className="mr-2 h-4 w-4" />
                       <span>Manage Remarks</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/recycle-bin" className="flex items-center cursor-pointer">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      <span>Recycle Bin</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>

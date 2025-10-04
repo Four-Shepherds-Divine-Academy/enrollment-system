@@ -127,7 +127,7 @@ export async function PUT(
   }
 }
 
-// DELETE fee template
+// DELETE fee template - Soft delete (move to recycle bin)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -148,6 +148,37 @@ export async function DELETE(
         { status: 409 }
       )
     }
+
+    // Get full template data for recycle bin
+    const template = await prisma.feeTemplate.findUnique({
+      where: { id },
+      include: {
+        breakdowns: true,
+        academicYear: true,
+      },
+    })
+
+    if (!template) {
+      return NextResponse.json(
+        { error: 'Fee template not found' },
+        { status: 404 }
+      )
+    }
+
+    // Create snapshot for recycle bin
+    const now = new Date()
+    const permanentDeleteAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
+    await prisma.recycleBin.create({
+      data: {
+        entityType: 'feeTemplate',
+        entityId: id,
+        entityData: template,
+        entityName: template.name,
+        deletedBy: 'admin', // Could be enhanced to get actual user from session
+        permanentDeleteAt,
+      },
+    })
 
     await prisma.feeTemplate.delete({
       where: { id },
