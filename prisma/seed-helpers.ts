@@ -22,10 +22,6 @@ export const SECTION_DEFINITIONS = [
   { name: 'Integrity', gradeLevel: 'Grade 8' },
   { name: 'Perseverance', gradeLevel: 'Grade 9' },
   { name: 'Integrity', gradeLevel: 'Grade 10' },
-
-  // Senior High sections
-  { name: 'Optimism', gradeLevel: 'Grade 11' },
-  { name: 'Dependability', gradeLevel: 'Grade 12' },
 ]
 
 /**
@@ -100,8 +96,6 @@ export function extractSectionName(sectionText: string): string {
     'Responsibility',
     'Perseverance',
     'Integrity',
-    'Optimism',
-    'Dependability',
   ]
 
   return validSections.includes(sectionName) ? sectionName : 'Enthusiasm'

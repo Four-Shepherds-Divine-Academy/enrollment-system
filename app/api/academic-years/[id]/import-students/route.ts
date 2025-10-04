@@ -169,8 +169,6 @@ function getNextGradeLevel(currentGrade: string): string {
     'Grade 7': 'Grade 8',
     'Grade 8': 'Grade 9',
     'Grade 9': 'Grade 10',
-    'Grade 10': 'Grade 11', // If applicable
-    'Grade 11': 'Grade 12', // If applicable
   }
 
   return gradeMapping[currentGrade] || currentGrade

@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Loader2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useActiveAcademicYear } from '@/hooks/use-academic-years'
 import { useStudentSearch, useCreateStudent } from '@/hooks/use-students'
@@ -898,6 +899,7 @@ export function EnrollmentForm() {
               className="w-full"
               disabled={createMutation.isPending}
             >
+              {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {createMutation.isPending ? 'Enrolling...' : 'Enroll Student'}
             </Button>
           </form>

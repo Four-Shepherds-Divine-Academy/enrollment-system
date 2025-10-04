@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, DollarSign } from 'lucide-react'
 import { useStudent, useUpdateStudent } from '@/hooks/use-students'
 import { useSections } from '@/hooks/use-sections'
 import { usePhLocations } from '@/hooks/use-ph-locations'
@@ -167,6 +167,14 @@ export default function EditStudentPage() {
           </div>
         </div>
         <div className="flex gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push(`/admin/dashboard/students/${params.id}/payments`)}
+          >
+            <DollarSign className="w-4 h-4 mr-2" />
+            Payment History
+          </Button>
           <Button
             type="button"
             variant="outline"

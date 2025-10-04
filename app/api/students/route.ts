@@ -15,6 +15,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const search = searchParams.get('search')
     const remark = searchParams.get('remark')
     const academicYear = searchParams.get('academicYear')
+    const paymentStatus = searchParams.get('paymentStatus')
 
     const where: Prisma.StudentWhereInput = {}
 
@@ -46,11 +47,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Academic year filter
-    if (academicYear) {
+    if (academicYear && academicYear.trim() !== '') {
       where.enrollments = {
         some: {
           schoolYear: academicYear
         }
+      }
+    }
+
+    // Payment status filter - only apply if explicitly selected (not 'All Payment Status')
+    if (paymentStatus && paymentStatus.trim() !== '' && paymentStatus !== 'All Payment Status') {
+      where.feeStatus = {
+        some: {
+          paymentStatus: paymentStatus,
+          ...(academicYear && academicYear.trim() !== '' ? { academicYearId: academicYear } : {}),
+        },
       }
     }
 
@@ -98,6 +109,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           orderBy: {
             enrollmentDate: 'desc'
           }
+        },
+        feeStatus: {
+          select: {
+            paymentStatus: true,
+            balance: true,
+            totalDue: true,
+            totalPaid: true,
+            isLatePayment: true,
+            academicYearId: true,
+          },
+          ...(academicYear && academicYear.trim() !== '' ? { where: { academicYearId: academicYear } } : {}),
         },
       },
       orderBy: {

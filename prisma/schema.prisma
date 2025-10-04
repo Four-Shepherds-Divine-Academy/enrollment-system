@@ -50,6 +50,12 @@ model Student {
   enrollments      Enrollment[]
   notifications    Notification[]
 
+  // Payment Information
+  payments         Payment[]
+  paymentAdjustments PaymentAdjustment[]
+  feeStatus        StudentFeeStatus[]
+  refunds          Refund[]
+
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -70,6 +76,11 @@ model AcademicYear {
   isActive         Boolean          @default(false)
 
   enrollments      Enrollment[]
+  feeTemplates     FeeTemplate[]
+  payments         Payment[]
+  paymentAdjustments PaymentAdjustment[]
+  studentFeeStatuses StudentFeeStatus[]
+  refunds          Refund[]
 
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -173,5 +184,237 @@ enum NotificationType {
   ENROLLMENT
   SYSTEM
   ALERT
+}
+
+// Fee Management Models
+
+model FeeTemplate {
+  id               String           @id @default(cuid())
+  name             String           // e.g., "Grade 1 Tuition 2024-2025"
+  gradeLevel       String           // e.g., "Grade 1", "Kinder 1"
+  academicYearId   String
+  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  totalAmount      Float            // Total fee amount
+  isActive         Boolean          @default(true)
+  description      String?
+
+  breakdowns       FeeBreakdown[]
+  studentFeeStatuses StudentFeeStatus[]
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([gradeLevel, academicYearId])
+  @@index([gradeLevel])
+  @@index([academicYearId])
+  @@index([isActive])
+}
+
+model FeeBreakdown {
+  id               String           @id @default(cuid())
+  feeTemplateId    String
+  feeTemplate      FeeTemplate      @relation(fields: [feeTemplateId], references: [id], onDelete: Cascade)
+
+  description      String           // e.g., "Tuition Fee", "Books", "Lab Fee"
+  amount           Float
+  category         FeeCategory      @default(MISC)
+  order            Int              @default(0) // For display ordering
+  isRefundable     Boolean          @default(true) // Whether payments for this fee can be refunded
+
+  // Payment tracking
+  paymentLineItems PaymentLineItem[]
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([feeTemplateId])
+}
+
+model Payment {
+  id               String           @id @default(cuid())
+  studentId        String
+  student          Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  academicYearId   String
+  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id])
+
+  amountPaid       Float
+  paymentDate      DateTime         @default(now())
+  paymentMethod    PaymentMethod    @default(CASH)
+  referenceNumber  String?          // For check/online payment reference
+  remarks          String?
+
+  // Refund tracking (deprecated - use Refund model)
+  isRefunded       Boolean          @default(false)
+  refundAmount     Float            @default(0)
+  refundDate       DateTime?
+  refundReason     String?
+  refundedBy       String?          // Admin who processed refund
+
+  // Relations
+  lineItems        PaymentLineItem[]
+  refunds          Refund[]
+
+  createdBy        String?          // Admin who recorded payment
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([studentId])
+  @@index([academicYearId])
+  @@index([paymentDate])
+  @@index([isRefunded])
+}
+
+model Refund {
+  id               String           @id @default(cuid())
+  paymentId        String
+  payment          Payment          @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  studentId        String
+  student          Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  academicYearId   String
+  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id])
+
+  amount           Float
+  reason           String
+  referenceNumber  String?          // Refund reference number
+  remarks          String?
+
+  refundedBy       String?          // Admin who processed refund
+  refundDate       DateTime         @default(now())
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([paymentId])
+  @@index([studentId])
+  @@index([academicYearId])
+  @@index([refundDate])
+}
+
+model PaymentLineItem {
+  id               String           @id @default(cuid())
+  paymentId        String
+  payment          Payment          @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  feeBreakdownId   String
+  feeBreakdown     FeeBreakdown     @relation(fields: [feeBreakdownId], references: [id])
+
+  amount           Float            // Amount paid for this specific line item
+  description      String           // Snapshot of fee description
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([paymentId])
+  @@index([feeBreakdownId])
+}
+
+model PaymentAdjustment {
+  id               String           @id @default(cuid())
+  studentId        String
+  student          Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  academicYearId   String
+  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id])
+
+  type             AdjustmentType   // DISCOUNT or ADDITIONAL
+  amount           Float            // Positive number (direction determined by type)
+  reason           String           // e.g., "Sibling Discount", "Late Payment Fee"
+  description      String?
+
+  createdBy        String?          // Admin who created adjustment
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([studentId])
+  @@index([academicYearId])
+  @@index([type])
+}
+
+model StudentFeeStatus {
+  id               String           @id @default(cuid())
+  studentId        String
+  student          Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  academicYearId   String
+  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id])
+
+  feeTemplateId    String?
+  feeTemplate      FeeTemplate?     @relation(fields: [feeTemplateId], references: [id])
+
+  // Computed fields
+  baseFee          Float            @default(0) // From fee template
+  totalAdjustments Float            @default(0) // Sum of adjustments (discounts negative, additions positive)
+  totalDue         Float            @default(0) // baseFee + totalAdjustments
+  totalPaid        Float            @default(0) // Sum of payments
+  balance          Float            @default(0) // totalDue - totalPaid
+
+  // Payment status
+  paymentStatus    PaymentStatus    @default(UNPAID)
+  isLatePayment    Boolean          @default(false)
+  lateSince        DateTime?
+
+  lastPaymentDate  DateTime?
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([studentId, academicYearId])
+  @@index([studentId])
+  @@index([academicYearId])
+  @@index([paymentStatus])
+  @@index([isLatePayment])
+}
+
+enum FeeCategory {
+  TUITION
+  BOOKS
+  UNIFORM
+  LABORATORY
+  LIBRARY
+  ID_CARD
+  EXAM
+  REGISTRATION
+  MISC
+}
+
+enum PaymentMethod {
+  CASH
+  CHECK
+  BANK_TRANSFER
+  ONLINE
+  GCASH
+  PAYMAYA
+}
+
+enum AdjustmentType {
+  DISCOUNT
+  ADDITIONAL
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  OVERPAID
+}
+
+model CustomRemark {
+  id          String   @id @default(cuid())
+  label       String   // The remark text (e.g., "Pending SF9")
+  category    String   // Category: documents, payment, behavioral, administrative, special, or custom
+  isActive    Boolean  @default(true) // Can be deactivated without deleting
+  sortOrder   Int      @default(0) // For custom ordering
+
+  createdBy   String?  // Admin who created it
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
 }
 

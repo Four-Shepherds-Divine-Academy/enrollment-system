@@ -26,6 +26,8 @@ export const STUDENT_REMARK_CATEGORIES: RemarkCategory[] = [
       'Pending PSA',
       'Pending Report Card',
       'Pending Transfer Credentials',
+      'Pending SF9',
+      'Pending SF10',
     ],
   },
   {

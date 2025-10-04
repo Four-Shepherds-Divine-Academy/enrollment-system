@@ -38,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Pencil, Trash2, Eye, ArrowRightLeft, Loader2, User, MapPin, Phone, GraduationCap, History, FileText } from 'lucide-react'
+import { Pencil, Trash2, Eye, ArrowRightLeft, Loader2, User, MapPin, Phone, GraduationCap, History, FileText, DollarSign } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { useRouter } from 'next/navigation'
@@ -83,6 +83,14 @@ type Student = {
     status: string
     enrollmentDate: string
   }>
+  feeStatus?: Array<{
+    paymentStatus: string
+    balance: number
+    totalDue: number
+    totalPaid: number
+    isLatePayment: boolean
+    academicYearId: string
+  }>
 }
 
 // Helper function to format full address
@@ -125,8 +133,12 @@ export default function StudentsListPage() {
   const [newGradeLevel, setNewGradeLevel] = useState('')
   const [newSection, setNewSection] = useState('')
 
+  // Track which student is being acted upon
+  const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null)
+  const [switchingStudentId, setSwitchingStudentId] = useState<string | null>(null)
+
   // Zustand store - only for UI state
-  const { filters, setSearchQuery, setGradeLevel, setStatus, setRemark } = useStudentsStore()
+  const { filters, setSearchQuery, setGradeLevel, setStatus, setRemark, setPaymentStatus } = useStudentsStore()
 
   // Generate remark options dynamically
   const remarkOptions = useMemo(() => {
@@ -150,6 +162,7 @@ export default function StudentsListPage() {
     status: filters.status,
     remark: filters.remark,
     academicYear: filters.academicYear,
+    paymentStatus: filters.paymentStatus,
     sortBy: filters.sortBy,
     sortOrder: filters.sortOrder,
   })
@@ -204,11 +217,16 @@ export default function StudentsListPage() {
 
   const handleDeleteConfirm = () => {
     if (studentToDelete) {
+      setDeletingStudentId(studentToDelete.id)
       deleteMutation.mutate(studentToDelete.id, {
         onSuccess: () => {
           setDeleteDialogOpen(false)
           setStudentToDelete(null)
+          setDeletingStudentId(null)
         },
+        onError: () => {
+          setDeletingStudentId(null)
+        }
       })
     }
   }
@@ -227,6 +245,7 @@ export default function StudentsListPage() {
 
   const handleSwitchConfirm = () => {
     if (selectedStudent && activeYear) {
+      setSwitchingStudentId(selectedStudent.id)
       switchMutation.mutate(
         {
           id: selectedStudent.id,
@@ -238,7 +257,11 @@ export default function StudentsListPage() {
           onSuccess: () => {
             setSwitchDialogOpen(false)
             setSelectedStudent(null)
+            setSwitchingStudentId(null)
           },
+          onError: () => {
+            setSwitchingStudentId(null)
+          }
         }
       )
     }
@@ -255,6 +278,28 @@ export default function StudentsListPage() {
       <Badge variant={config.variant} className={config.className}>
         {status}
       </Badge>
+    )
+  }
+
+  const getPaymentStatusBadge = (status: string, isLate: boolean = false) => {
+    const variants: Record<string, { className: string }> = {
+      PAID: { className: 'bg-green-100 text-green-700 border-green-300' },
+      PARTIAL: { className: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+      UNPAID: { className: 'bg-red-100 text-red-700 border-red-300' },
+      OVERPAID: { className: 'bg-blue-100 text-blue-700 border-blue-300' },
+    }
+    const config = variants[status] || variants.UNPAID
+    return (
+      <div className="flex items-center gap-1">
+        <Badge variant="outline" className={config.className}>
+          {status}
+        </Badge>
+        {isLate && (
+          <Badge variant="destructive" className="text-xs">
+            LATE
+          </Badge>
+        )}
+      </div>
     )
   }
 
@@ -335,6 +380,21 @@ export default function StudentsListPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="w-full md:w-48">
+              <Label htmlFor="payment-status">Payment Status</Label>
+              <Select value={filters.paymentStatus || 'All Payment Status'} onValueChange={setPaymentStatus}>
+                <SelectTrigger id="payment-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All Payment Status">All Payment Status</SelectItem>
+                  <SelectItem value="PAID">Paid</SelectItem>
+                  <SelectItem value="PARTIAL">Partial</SelectItem>
+                  <SelectItem value="UNPAID">Unpaid</SelectItem>
+                  <SelectItem value="OVERPAID">Overpaid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -368,6 +428,7 @@ export default function StudentsListPage() {
                     <TableHead>Contact</TableHead>
                     <TableHead className="max-w-sm">Address</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Payment</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -394,11 +455,22 @@ export default function StudentsListPage() {
                       </TableCell>
                       <TableCell>{getStatusBadge(student.enrollmentStatus)}</TableCell>
                       <TableCell>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 h-auto font-normal"
+                          onClick={() => router.push(`/admin/dashboard/students/${student.id}/payments`)}
+                        >
+                          Payment History
+                        </Button>
+                      </TableCell>
+                      <TableCell>
                         <div className="flex gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleViewDetails(student)}
+                            disabled={deletingStudentId !== null || switchingStudentId !== null}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -406,6 +478,7 @@ export default function StudentsListPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => router.push(`/admin/dashboard/students/${student.id}/edit`)}
+                            disabled={deletingStudentId !== null || switchingStudentId !== null}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -413,6 +486,7 @@ export default function StudentsListPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleSwitchClick(student)}
+                            disabled={deletingStudentId !== null || switchingStudentId !== null}
                           >
                             <ArrowRightLeft className="h-4 w-4" />
                           </Button>
@@ -420,6 +494,7 @@ export default function StudentsListPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteClick(student)}
+                            disabled={deletingStudentId !== null || switchingStudentId !== null}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -644,9 +719,21 @@ export default function StudentsListPage() {
               )}
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDetailsOpen(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setViewDetailsOpen(false)} className="sm:mr-auto">
               Close
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setViewDetailsOpen(false)
+                if (selectedStudent) {
+                  router.push(`/admin/dashboard/students/${selectedStudent.id}/payments`)
+                }
+              }}
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              Payment History
             </Button>
             <Button onClick={() => {
               setViewDetailsOpen(false)

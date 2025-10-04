@@ -24,6 +24,7 @@ interface StudentsFilters {
   status?: string;
   academicYear?: string;
   remark?: string;
+  paymentStatus?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -54,6 +55,9 @@ export function useStudents(filters: StudentsFilters = {}) {
       }
       if (filters.remark && filters.remark !== 'All Remarks') {
         params.append('remark', filters.remark);
+      }
+      if (filters.paymentStatus && filters.paymentStatus !== 'All Payment Status') {
+        params.append('paymentStatus', filters.paymentStatus);
       }
       if (filters.academicYear) params.append('academicYear', filters.academicYear);
       if (filters.sortBy) params.append('sortBy', filters.sortBy);

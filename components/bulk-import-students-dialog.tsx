@@ -21,6 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Card, CardContent } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
 import { Loader2, Search, Users, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
@@ -100,8 +103,6 @@ export function BulkImportStudentsDialog({
     'Grade 8',
     'Grade 9',
     'Grade 10',
-    'Grade 11',
-    'Grade 12',
   ]
 
   const fetchStudents = async () => {
@@ -444,7 +445,7 @@ export function BulkImportStudentsDialog({
       }}
     >
       <DialogContent
-        className="max-w-6xl max-h-[85vh] flex flex-col"
+        className="max-w-[90vw] sm:max-w-[90vw] max-h-[85vh] flex flex-col"
         onPointerDownOutside={(e) => {
           // Prevent closing by clicking outside during import
           if (importing) {
@@ -469,18 +470,23 @@ export function BulkImportStudentsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+        <div className="space-y-6 flex-1 overflow-hidden flex flex-col">
           {/* Source Year Selection */}
           <div className="space-y-2">
-            <Label>Select Source Academic Year</Label>
+            <Label className="text-sm font-medium">Select Source Academic Year</Label>
             <Select value={sourceYearId} onValueChange={setSourceYearId}>
-              <SelectTrigger>
+              <SelectTrigger className="h-10">
                 <SelectValue placeholder="Choose academic year..." />
               </SelectTrigger>
               <SelectContent>
                 {availableYears.map((year) => (
                   <SelectItem key={year.id} value={year.id}>
-                    {year.name} {year.isActive && '(Active)'}
+                    <div className="flex items-center gap-2">
+                      <span>{year.name}</span>
+                      {year.isActive && (
+                        <Badge variant="secondary" className="text-xs">Active</Badge>
+                      )}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -490,186 +496,232 @@ export function BulkImportStudentsDialog({
           {/* Search and Actions */}
           {sourceYearId && (
             <>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search by name, LRN, or grade..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 h-10"
                   />
                 </div>
                 <Button
                   variant="outline"
-                  size="sm"
                   onClick={handleSelectAll}
                   disabled={loading || filteredStudents.length === 0}
+                  className="shrink-0"
                 >
                   {allSelected ? 'Unselect All' : 'Select All'}
                 </Button>
               </div>
 
               {/* Student List */}
-              <div className="flex-1 overflow-y-auto border rounded-md">
-                {loading ? (
-                  <div className="flex items-center justify-center h-48">
-                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-                  </div>
-                ) : filteredStudents.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-48 text-gray-500">
-                    <Users className="h-12 w-12 mb-2 text-gray-300" />
-                    <p>No students available to import</p>
-                    {searchQuery && (
-                      <p className="text-sm">Try adjusting your search</p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="divide-y">
-                    {filteredStudents.map((student) => (
-                      <div
-                        key={student.id}
-                        className="flex items-center gap-4 p-4 hover:bg-accent/50 transition-colors"
-                      >
-                        <Checkbox
-                          checked={selectedStudentIds.has(student.id)}
-                          onCheckedChange={() => handleToggleStudent(student.id)}
-                        />
-                        <div className="flex-1 grid grid-cols-[1fr,auto,auto] gap-4 items-center min-w-0">
-                          <div className="min-w-0">
-                            <p className="font-medium text-sm truncate">{student.fullName}</p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                              {student.lrn && <span>LRN: {student.lrn}</span>}
-                              {student.lrn && <span>•</span>}
-                              <span>Current: {student.currentGrade}</span>
-                              {student.section && (
-                                <>
-                                  <span>•</span>
-                                  <span>{student.section}</span>
-                                </>
-                              )}
+              <Card className="flex-1 overflow-hidden flex flex-col">
+                <CardContent className="p-0 flex-1 overflow-y-auto">
+                  {loading ? (
+                    <div className="flex items-center justify-center h-64">
+                      <div className="text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground">Loading students...</p>
+                      </div>
+                    </div>
+                  ) : filteredStudents.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                      <Users className="h-16 w-16 mb-4 text-muted-foreground/40" />
+                      <p className="font-medium">No students available to import</p>
+                      {searchQuery && (
+                        <p className="text-sm mt-1">Try adjusting your search criteria</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {filteredStudents.map((student) => (
+                        <div
+                          key={student.id}
+                          className="flex items-center gap-4 p-4 hover:bg-accent/50 transition-colors"
+                        >
+                          <Checkbox
+                            checked={selectedStudentIds.has(student.id)}
+                            onCheckedChange={() => handleToggleStudent(student.id)}
+                            className="shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium truncate">{student.fullName}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
+                                  {student.lrn && (
+                                    <Badge variant="outline" className="font-mono text-xs">
+                                      {student.lrn}
+                                    </Badge>
+                                  )}
+                                  <span className="flex items-center gap-1">
+                                    <span className="font-medium">Current:</span>
+                                    <span>{student.currentGrade}</span>
+                                  </span>
+                                  {student.section && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{student.section}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                                  Enroll to:
+                                </span>
+                                <Select
+                                  value={studentGrades.get(student.id) || student.nextGrade}
+                                  onValueChange={(value) => handleGradeChange(student.id, value)}
+                                >
+                                  <SelectTrigger className="w-[140px] h-9">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {AVAILABLE_GRADES.map((grade) => (
+                                      <SelectItem key={grade} value={grade}>
+                                        {grade}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 justify-end">
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              Enroll to:
-                            </span>
-                            <Select
-                              value={studentGrades.get(student.id) || student.nextGrade}
-                              onValueChange={(value) => handleGradeChange(student.id, value)}
-                            >
-                              <SelectTrigger className="w-[150px] h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {AVAILABLE_GRADES.map((grade) => (
-                                  <SelectItem key={grade} value={grade}>
-                                    {grade}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Summary */}
               {filteredStudents.length > 0 && (
-                <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
-                  <strong>{selectedStudentIds.size}</strong> of{' '}
-                  <strong>{filteredStudents.length}</strong> students selected
-                </div>
+                <Card className="bg-muted/50">
+                  <CardContent className="p-4">
+                    <div className="text-sm font-medium">
+                      <span className="text-primary text-lg">{selectedStudentIds.size}</span>
+                      <span className="text-muted-foreground"> of </span>
+                      <span className="text-foreground">{filteredStudents.length}</span>
+                      <span className="text-muted-foreground"> students selected</span>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </>
           )}
         </div>
 
         {importing && (
-          <div className="border-t pt-4 space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                Importing students...
-              </span>
-              <span className="font-medium">
-                {importProgress.current} / {importProgress.total}
-              </span>
-            </div>
+          <Separator />
+        )}
 
-            <Progress
-              value={(importProgress.current / importProgress.total) * 100}
-              className="h-2"
-            />
+        {importing && (
+          <Card className="bg-muted/50">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm font-medium">
+                    Importing students...
+                  </span>
+                </div>
+                <Badge variant="secondary">
+                  {importProgress.current} / {importProgress.total}
+                </Badge>
+              </div>
 
-            {importProgress.currentStudent && (
-              <p className="text-xs text-muted-foreground truncate">
-                {importProgress.currentStudent}
+              <Progress
+                value={(importProgress.current / importProgress.total) * 100}
+                className="h-2"
+              />
+
+              {importProgress.currentStudent && (
+                <p className="text-sm text-muted-foreground truncate">
+                  Processing: <span className="font-medium">{importProgress.currentStudent}</span>
+                </p>
+              )}
+
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span>{importProgress.succeeded} completed</span>
+                </div>
+                {importProgress.skipped > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground">{importProgress.skipped} skipped</span>
+                  </div>
+                )}
+                {importProgress.failed > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <XCircle className="h-4 w-4 text-destructive" />
+                    <span className="text-destructive">{importProgress.failed} failed</span>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></span>
+                Please wait, do not close this window
               </p>
-            )}
-
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span>{importProgress.succeeded} completed</span>
-              {importProgress.skipped > 0 && (
-                <span>{importProgress.skipped} skipped</span>
-              )}
-              {importProgress.failed > 0 && (
-                <span className="text-destructive">
-                  {importProgress.failed} failed
-                </span>
-              )}
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              Please wait, do not close this window
-            </p>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Failed Imports List */}
         {!importing && failedImports.length > 0 && (
-          <div className="border-t pt-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-destructive">
-                  Failed Imports ({failedImports.length})
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  The following students failed to import. Click retry to attempt again.
-                </p>
-              </div>
-              <Button
-                onClick={handleRetryFailed}
-                disabled={retrying}
-                size="sm"
-              >
-                {retrying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Retry All
-              </Button>
-            </div>
+          <>
+            <Separator />
+            <Card className="border-destructive/50 bg-destructive/5">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-destructive">
+                        Failed Imports ({failedImports.length})
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        The following students failed to import. Click retry to attempt again.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleRetryFailed}
+                    disabled={retrying}
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                  >
+                    {retrying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Retry All
+                  </Button>
+                </div>
 
-            <div className="border rounded-md max-h-[200px] overflow-y-auto">
-              <div className="divide-y">
-                {failedImports.map((failed, index) => (
-                  <div key={index} className="p-3 hover:bg-accent/50">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">
-                          {failed.studentName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Grade: {failed.gradeLevel}
-                        </p>
-                        <p className="text-xs text-destructive mt-1">
-                          Error: {failed.error}
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {failedImports.map((failed, index) => (
+                    <Card key={index} className="border-destructive/20">
+                      <CardContent className="p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {failed.studentName}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Grade: {failed.gradeLevel}
+                            </p>
+                            <p className="text-xs text-destructive mt-1 flex items-start gap-1">
+                              <XCircle className="h-3 w-3 shrink-0 mt-0.5" />
+                              <span>{failed.error}</span>
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={async () => {
                           try {
                             const response = await fetch(
                               `/api/academic-years/${targetAcademicYear.id}/import-students`,
@@ -718,33 +770,32 @@ export function BulkImportStudentsDialog({
                         Retry
                       </Button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
 
-        <DialogFooter>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={importing || retrying}
-            >
-              {failedImports.length > 0 ? 'Close' : 'Cancel'}
-            </Button>
-            <Button
-              onClick={handleImport}
-              disabled={
-                importing || retrying || selectedStudentIds.size === 0 || !sourceYearId
-              }
-            >
-              {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Import {selectedStudentIds.size > 0 && `(${selectedStudentIds.size})`}{' '}
-              Students
-            </Button>
-          </div>
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={importing || retrying}
+          >
+            {failedImports.length > 0 ? 'Close' : 'Cancel'}
+          </Button>
+          <Button
+            onClick={handleImport}
+            disabled={
+              importing || retrying || selectedStudentIds.size === 0 || !sourceYearId
+            }
+          >
+            {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {importing ? 'Importing...' : 'Import Students'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -72,8 +72,6 @@ const GRADE_LEVELS = [
   'Grade 8',
   'Grade 9',
   'Grade 10',
-  'Grade 11',
-  'Grade 12',
 ];
 
 export default function SectionsPage() {
@@ -94,6 +92,7 @@ export default function SectionsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingSection, setEditingSection] = useState<Section | null>(null);
   const [deletingSectionId, setDeletingSectionId] = useState<string | null>(null);
+  const [togglingSectionId, setTogglingSectionId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     gradeLevel: '',
@@ -143,7 +142,12 @@ export default function SectionsPage() {
   };
 
   const handleToggleStatus = (section: Section) => {
-    toggleStatus.mutate({ id: section.id, isActive: !section.isActive });
+    setTogglingSectionId(section.id);
+    toggleStatus.mutate({ id: section.id, isActive: !section.isActive }, {
+      onSettled: () => {
+        setTogglingSectionId(null);
+      }
+    });
   };
 
   const getSortIcon = (column: string) => {
@@ -288,15 +292,19 @@ export default function SectionsPage() {
                         section.isActive
                           ? 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-gray-300'
-                      }`}
-                      onClick={() => handleToggleStatus(section)}
+                      } ${togglingSectionId !== null ? 'opacity-50 cursor-wait' : ''}`}
+                      onClick={() => togglingSectionId === null && handleToggleStatus(section)}
                     >
                       <span className="flex items-center gap-1.5">
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            section.isActive ? 'bg-green-600' : 'bg-gray-400'
-                          }`}
-                        />
+                        {togglingSectionId === section.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              section.isActive ? 'bg-green-600' : 'bg-gray-400'
+                            }`}
+                          />
+                        )}
                         {section.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </Badge>
@@ -307,6 +315,7 @@ export default function SectionsPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleOpenModal(section)}
+                        disabled={togglingSectionId !== null || createSection.isPending || updateSection.isPending || deleteSection.isPending}
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -314,7 +323,7 @@ export default function SectionsPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => setDeletingSectionId(section.id)}
-                        disabled={section._count.students > 0}
+                        disabled={section._count.students > 0 || togglingSectionId !== null || createSection.isPending || updateSection.isPending || deleteSection.isPending}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

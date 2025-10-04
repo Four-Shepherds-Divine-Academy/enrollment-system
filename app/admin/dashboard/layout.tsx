@@ -25,10 +25,12 @@ import {
   ChevronDown,
   LayoutGrid,
   DollarSign,
-  Receipt
+  Receipt,
+  MessageSquare
 } from 'lucide-react'
 import { NotificationCenter } from '@/components/notification-center'
 import { ActiveYearBadge } from '@/components/active-year-badge'
+import { MissingFeeTemplatesAlert } from '@/components/missing-fee-templates-alert'
 
 export default async function AdminLayout({
   children,
@@ -136,6 +138,12 @@ export default async function AdminLayout({
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/custom-remarks" className="flex items-center cursor-pointer">
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      <span>Manage Remarks</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/admin/dashboard/reports" className="flex items-center cursor-pointer">
                       <FileText className="mr-2 h-4 w-4" />
                       <span>Reports</span>
@@ -144,14 +152,18 @@ export default async function AdminLayout({
 
                   <DropdownMenuSeparator />
 
-                  {/* Future menu items placeholder */}
-                  <DropdownMenuItem disabled>
-                    <Receipt className="mr-2 h-4 w-4" />
-                    <span>Fee Management</span>
+                  {/* Fee Management */}
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/fees" className="flex items-center cursor-pointer">
+                      <Receipt className="mr-2 h-4 w-4" />
+                      <span>Fee Management</span>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem disabled>
-                    <DollarSign className="mr-2 h-4 w-4" />
-                    <span>Payment History</span>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/payment-history" className="flex items-center cursor-pointer">
+                      <DollarSign className="mr-2 h-4 w-4" />
+                      <span>Payment History</span>
+                    </Link>
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
@@ -180,6 +192,11 @@ export default async function AdminLayout({
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Global Alert for Missing Fee Templates */}
+        <div className="mb-6">
+          <MissingFeeTemplatesAlert />
+        </div>
+
         {children}
       </main>
     </div>

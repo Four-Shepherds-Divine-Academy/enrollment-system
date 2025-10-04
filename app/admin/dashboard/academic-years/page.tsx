@@ -33,6 +33,7 @@ import {
 import { Pencil, Upload, Loader2 } from 'lucide-react'
 import { BulkImportStudentsDialog } from '@/components/bulk-import-students-dialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
 import { useAcademicYearsStore } from '@/store/academic-years-store'
 import {
   useAcademicYears,
@@ -78,6 +79,11 @@ export default function AcademicYearsPage() {
     startDate: string
     endDate: string
   } | null>(null)
+
+  // Track which year is being acted upon
+  const [activatingYearId, setActivatingYearId] = useState<string | null>(null)
+  const [deletingYearId, setDeletingYearId] = useState<string | null>(null)
+  const [updatingYearId, setUpdatingYearId] = useState<string | null>(null)
 
   // Zustand store
   const { filters } = useAcademicYearsStore()
@@ -151,11 +157,16 @@ export default function AcademicYearsPage() {
 
   const handleConfirmSwitch = () => {
     if (pendingActionYear) {
+      setActivatingYearId(pendingActionYear.id)
       activateMutation.mutate(pendingActionYear.id, {
         onSuccess: () => {
           setShowSwitchConfirm(false)
           setPendingActionYear(null)
+          setActivatingYearId(null)
         },
+        onError: () => {
+          setActivatingYearId(null)
+        }
       })
     }
   }
@@ -167,11 +178,16 @@ export default function AcademicYearsPage() {
 
   const handleConfirmDelete = () => {
     if (pendingActionYear) {
+      setDeletingYearId(pendingActionYear.id)
       deleteMutation.mutate(pendingActionYear.id, {
         onSuccess: () => {
           setShowDeleteConfirm(false)
           setPendingActionYear(null)
+          setDeletingYearId(null)
         },
+        onError: () => {
+          setDeletingYearId(null)
+        }
       })
     }
   }
@@ -188,6 +204,7 @@ export default function AcademicYearsPage() {
 
   const handleSaveEdit = () => {
     if (editData) {
+      setUpdatingYearId(editData.id)
       updateMutation.mutate(
         {
           id: editData.id,
@@ -201,33 +218,40 @@ export default function AcademicYearsPage() {
           onSuccess: () => {
             setShowEditDialog(false)
             setEditData(null)
+            setUpdatingYearId(null)
           },
+          onError: () => {
+            setUpdatingYearId(null)
+          }
         }
       )
     }
   }
 
   const handleUpdateEndDate = (id: string, endDate: string) => {
+    setUpdatingYearId(id)
     updateMutation.mutate({
       id,
       data: { endDate },
+    }, {
+      onSettled: () => {
+        setUpdatingYearId(null)
+      }
     })
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Academic Years</h2>
-          <p className="text-gray-600 mt-1">
+          <h2 className="text-3xl font-bold tracking-tight">Academic Years</h2>
+          <p className="text-muted-foreground mt-1.5">
             Manage school academic years and enrollment periods
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowForm(!showForm)}>
-            {showForm ? 'Cancel' : 'Create New Academic Year'}
-          </Button>
-        </div>
+        <Button onClick={() => setShowForm(!showForm)} size="default">
+          {showForm ? 'Cancel' : 'Create New Academic Year'}
+        </Button>
       </div>
 
       {showForm && (
@@ -272,27 +296,32 @@ export default function AcademicYearsPage() {
               </div>
 
               {academicYears.length > 0 && (
-                <div className="flex items-center space-x-2 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <Checkbox
-                    id="importStudents"
-                    checked={importPreviousStudents}
-                    onCheckedChange={(checked) =>
-                      setImportPreviousStudents(checked as boolean)
-                    }
-                  />
-                  <div className="flex-1">
-                    <Label
-                      htmlFor="importStudents"
-                      className="text-sm font-medium cursor-pointer"
-                    >
-                      Import students from previous academic year
-                    </Label>
-                    <p className="text-xs text-gray-600 mt-1">
-                      After creating this year, you'll be able to select which students
-                      to import and choose their grade level (advance, repeat, or graduate).
-                    </p>
-                  </div>
-                </div>
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-start space-x-3">
+                      <Checkbox
+                        id="importStudents"
+                        checked={importPreviousStudents}
+                        onCheckedChange={(checked) =>
+                          setImportPreviousStudents(checked as boolean)
+                        }
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <Label
+                          htmlFor="importStudents"
+                          className="text-sm font-medium cursor-pointer"
+                        >
+                          Import students from previous academic year
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          After creating this year, you'll be able to select which students
+                          to import and choose their grade level (advance, repeat, or graduate).
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               <Button type="submit" disabled={createMutation.isPending}>
@@ -305,32 +334,42 @@ export default function AcademicYearsPage() {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle>Academic Years ({academicYears.length})</CardTitle>
+        <CardHeader className="border-b">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl">Academic Years</CardTitle>
+            <Badge variant="secondary" className="text-sm">
+              {academicYears.length} {academicYears.length === 1 ? 'year' : 'years'}
+            </Badge>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Year</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>End Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Enrollments</TableHead>
-                <TableHead>Actions</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="font-semibold">Year</TableHead>
+                <TableHead className="font-semibold">Start Date</TableHead>
+                <TableHead className="font-semibold">End Date</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="font-semibold">Enrollments</TableHead>
+                <TableHead className="font-semibold text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" />
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={6} className="text-center py-12">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Loading academic years...</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : academicYears.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                    No academic years created yet. Create one to start enrolling students.
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={6} className="text-center py-12">
+                    <p className="text-muted-foreground">
+                      No academic years created yet. Create one to start enrolling students.
+                    </p>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -344,9 +383,9 @@ export default function AcademicYearsPage() {
                       {year.endDate ? (
                         new Date(year.endDate).toLocaleDateString()
                       ) : (
-                        <input
+                        <Input
                           type="date"
-                          className="border rounded px-2 py-1 text-sm"
+                          className="max-w-[160px] h-9"
                           onChange={(e) =>
                             handleUpdateEndDate(year.id, e.target.value)
                           }
@@ -355,31 +394,23 @@ export default function AcademicYearsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-1">
-                        {year.isActive && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border-green-300">
-                            Active
-                          </span>
-                        )}
-                        {!year.isActive && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 border-yellow-300">
-                            Inactive
-                          </span>
-                        )}
-                      </div>
+                      {year.isActive ? (
+                        <Badge className="bg-green-100 text-green-700 border-green-300 hover:bg-green-100">
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">
+                          Inactive
+                        </Badge>
+                      )}
                     </TableCell>
-                    <TableCell>{year._count?.enrollments || 0}</TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditYear(year)}
-                          disabled={updateMutation.isPending}
-                        >
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
+                      <Badge variant="outline" className="font-mono">
+                        {year._count?.enrollments || 0}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
                         {year.isActive && (
                           <Button
                             variant="outline"
@@ -388,9 +419,10 @@ export default function AcademicYearsPage() {
                               setImportTargetYear(year)
                               setShowImportDialog(true)
                             }}
-                            className="border-blue-500 text-blue-700 hover:bg-blue-50"
+                            disabled={activatingYearId !== null || deletingYearId !== null || updatingYearId !== null}
+                            className="border-blue-500 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
                           >
-                            <Upload className="h-4 w-4 mr-1" />
+                            <Upload className="h-4 w-4 mr-2" />
                             Import Students
                           </Button>
                         )}
@@ -399,19 +431,34 @@ export default function AcademicYearsPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleSwitchYear(year)}
-                            disabled={activateMutation.isPending}
-                            className="border-green-500 text-green-700 hover:bg-green-50"
+                            disabled={activatingYearId !== null || deletingYearId !== null || updatingYearId !== null}
+                            className="border-green-600 text-green-700 hover:bg-green-50 hover:text-green-800"
                           >
+                            {activatingYearId === year.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             Activate
                           </Button>
                         )}
                         <Button
-                          variant="outline"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditYear(year)}
+                          disabled={activatingYearId !== null || deletingYearId !== null || updatingYearId !== null}
+                        >
+                          {updatingYearId === year.id ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Pencil className="h-4 w-4 mr-2" />
+                          )}
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteYear(year)}
-                          disabled={deleteMutation.isPending}
-                          className="border-red-500 text-red-700 hover:bg-red-50"
+                          disabled={activatingYearId !== null || deletingYearId !== null || updatingYearId !== null}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
+                          {deletingYearId === year.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                           Delete
                         </Button>
                       </div>
@@ -451,11 +498,13 @@ export default function AcademicYearsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={createMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmCreate}
+              disabled={createMutation.isPending}
               className="bg-orange-600 hover:bg-orange-700"
             >
+              {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Yes, Create New Year
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -479,8 +528,9 @@ export default function AcademicYearsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSwitch}>
+            <AlertDialogCancel disabled={activateMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSwitch} disabled={activateMutation.isPending}>
+              {activateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Yes, Switch Year
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -511,11 +561,13 @@ export default function AcademicYearsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
+              disabled={deleteMutation.isPending}
               className="bg-red-600 hover:bg-red-700"
             >
+              {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Yes, Delete Year
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -7,6 +7,7 @@ interface StudentsFilters {
   status: string;
   academicYear: string;
   remark: string;
+  paymentStatus: string;
   sortBy: string;
   sortOrder: 'asc' | 'desc';
 }
@@ -18,6 +19,7 @@ interface StudentsStore {
   setStatus: (status: string) => void;
   setAcademicYear: (academicYear: string) => void;
   setRemark: (remark: string) => void;
+  setPaymentStatus: (paymentStatus: string) => void;
   setSortBy: (sortBy: string) => void;
   setSortOrder: (sortOrder: 'asc' | 'desc') => void;
   toggleSort: (column: string) => void;
@@ -30,6 +32,7 @@ const defaultFilters: StudentsFilters = {
   status: 'All Status',
   academicYear: '',
   remark: 'All Remarks',
+  paymentStatus: 'All Payment Status',
   sortBy: 'fullName',
   sortOrder: 'asc',
 };
@@ -62,6 +65,11 @@ export const useStudentsStore = create<StudentsStore>()(
       setRemark: (remark) =>
         set((state) => ({
           filters: { ...state.filters, remark },
+        })),
+
+      setPaymentStatus: (paymentStatus) =>
+        set((state) => ({
+          filters: { ...state.filters, paymentStatus },
         })),
 
       setSortBy: (sortBy) =>
@@ -101,7 +109,7 @@ export const useStudentsStore = create<StudentsStore>()(
     {
       name: 'students-filters',
       partialize: (state) => ({ filters: state.filters }),
-      version: 1,
+      version: 2,
       migrate: (persistedState: any, version: number) => {
         if (version === 0) {
           // Add remark field to old state
@@ -109,6 +117,16 @@ export const useStudentsStore = create<StudentsStore>()(
             filters: {
               ...persistedState.filters,
               remark: 'All Remarks',
+              paymentStatus: 'All Payment Status',
+            },
+          };
+        }
+        if (version === 1) {
+          // Add paymentStatus field to state
+          return {
+            filters: {
+              ...persistedState.filters,
+              paymentStatus: 'All Payment Status',
             },
           };
         }
