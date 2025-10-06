@@ -89,6 +89,11 @@ export default function EditStudentPage() {
     setSelectedCity,
   } = usePhLocations()
 
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Edit Student'
+  }, [])
+
   // Populate form when student data is loaded
   useEffect(() => {
     if (student) {

@@ -34,8 +34,28 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         fullName: true,
         gradeLevel: true,
         contactNumber: true,
+        enrollmentStatus: true,
       },
     })
+
+    // Get enrollments for the current academic year
+    const enrollments = await prisma.enrollment.findMany({
+      where: {
+        academicYearId,
+        studentId: {
+          in: students.map(s => s.id)
+        }
+      },
+      select: {
+        studentId: true,
+        status: true,
+      },
+    })
+
+    // Create a map of enrollment status by studentId
+    const enrollmentStatusMap = new Map(
+      enrollments.map(e => [e.studentId, e.status])
+    )
 
     // Get all existing fee statuses in a single query
     const existingStatuses = await prisma.studentFeeStatus.findMany({
@@ -52,6 +72,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             fullName: true,
             gradeLevel: true,
             contactNumber: true,
+            enrollmentStatus: true,
           },
         },
         academicYear: {
@@ -69,9 +90,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
     })
 
+    // Add enrollment status for current year to each fee status
+    const statusesWithEnrollment = existingStatuses.map(status => ({
+      ...status,
+      currentYearEnrollmentStatus: enrollmentStatusMap.get(status.studentId) || null,
+    }))
+
     // Create a map of existing statuses by studentId for quick lookup
     const existingStatusMap = new Map(
-      existingStatuses.map(status => [status.studentId, status])
+      statusesWithEnrollment.map(status => [status.studentId, status])
     )
 
     // Find students that don't have a fee status yet
@@ -127,6 +154,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
                   fullName: true,
                   gradeLevel: true,
                   contactNumber: true,
+                  enrollmentStatus: true,
                 },
               },
               academicYear: {
@@ -144,7 +172,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             },
           })
 
-          newStatuses.push(status)
+          // Add enrollment status for current year
+          const statusWithEnrollment = {
+            ...status,
+            currentYearEnrollmentStatus: enrollmentStatusMap.get(student.id) || null,
+          }
+
+          newStatuses.push(statusWithEnrollment)
         } catch (error: any) {
           console.error(`Error upserting fee status for student ${student.id}:`, error)
         }
@@ -152,7 +186,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Combine existing and newly created statuses
-    const allStatuses = [...existingStatuses, ...newStatuses]
+    const allStatuses = [...statusesWithEnrollment, ...newStatuses]
 
     // Apply payment status filter if specified
     let filteredStatuses = allStatuses

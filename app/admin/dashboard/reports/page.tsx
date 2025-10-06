@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { usePaymentHistory } from '@/hooks/use-fees'
 import { useFeeTemplates } from '@/hooks/use-fees'
@@ -89,6 +89,11 @@ const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b
 export default function ReportsPage() {
   const [selectedYearId, setSelectedYearId] = useState<string>('')
   const [activeTab, setActiveTab] = useState('enrollment')
+
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Reports'
+  }, [])
 
   const { data: academicYears = [] } = useQuery<AcademicYear[]>({
     queryKey: ['academic-years'],

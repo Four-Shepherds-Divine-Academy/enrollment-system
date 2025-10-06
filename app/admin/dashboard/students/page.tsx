@@ -63,6 +63,7 @@ type Student = {
   city: string
   province: string
   enrollmentStatus: string
+  currentYearEnrollmentStatus?: string | null
   isTransferee: boolean
   previousSchool: string | null
   gender: string
@@ -139,6 +140,11 @@ export default function StudentsListPage() {
 
   // Zustand store - only for UI state
   const { filters, setSearchQuery, setGradeLevel, setStatus, setRemark, setPaymentStatus } = useStudentsStore()
+
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Students'
+  }, [])
 
   // Generate remark options dynamically
   const remarkOptions = useMemo(() => {
@@ -453,7 +459,9 @@ export default function StudentsListPage() {
                           {formatAddress(student)}
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(student.enrollmentStatus)}</TableCell>
+                      <TableCell>
+                        {getStatusBadge(student.currentYearEnrollmentStatus || student.enrollmentStatus)}
+                      </TableCell>
                       <TableCell>
                         <Button
                           variant="link"
@@ -543,8 +551,8 @@ export default function StudentsListPage() {
                     <p className="text-sm font-medium">{selectedStudent.gender}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-xs text-gray-500">Status</p>
-                    {getStatusBadge(selectedStudent.enrollmentStatus)}
+                    <p className="text-xs text-gray-500">Status (Current Year)</p>
+                    {getStatusBadge(selectedStudent.currentYearEnrollmentStatus || selectedStudent.enrollmentStatus)}
                   </div>
                 </div>
               </div>

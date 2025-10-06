@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -89,6 +89,11 @@ export default function CustomRemarksPage() {
   const updateMutation = useUpdateCustomRemark()
   const deleteMutation = useDeleteCustomRemark()
   const { data: studentsWithRemark = [], isLoading: isLoadingStudents } = useStudentsByRemark(selectedRemarkForStudents)
+
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Custom Remarks'
+  }, [])
 
   const handleOpenDialog = (remark?: CustomRemark) => {
     if (remark) {

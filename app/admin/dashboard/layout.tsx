@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Toaster } from 'sonner'
 import { prisma } from '@/lib/prisma'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import Image from 'next/image'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,9 +63,13 @@ export default async function AdminLayout({
             {/* Logo and Brand */}
             <div className="flex items-center space-x-8">
               <Link href="/admin/dashboard" className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">4S</span>
-                </div>
+                <Image
+                  src="/logo.jpg"
+                  alt="4SDA Logo"
+                  width={40}
+                  height={40}
+                  className="w-10 h-10 rounded-full object-cover"
+                />
                 <h1 className="text-xl font-bold text-gray-900">
                   {process.env.APP_NAME || '4SDA'} Admin
                 </h1>

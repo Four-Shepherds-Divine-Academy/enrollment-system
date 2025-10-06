@@ -49,13 +49,17 @@ export function useAcademicYears(filters: AcademicYearsFilters = {}) {
       if (filters.sortBy) params.append('sortBy', filters.sortBy);
       if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
 
-      const response = await fetch(`/api/academic-years?${params.toString()}`);
+      const response = await fetch(`/api/academic-years?${params.toString()}`, {
+        cache: 'no-store', // Don't cache API responses
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch academic years');
       }
       return response.json();
     },
-    staleTime: 0, // Always refetch on mount
+    staleTime: 0, // Always consider data stale
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
     gcTime: 5 * 60 * 1000, // 5 minutes
   });
 }
@@ -65,14 +69,18 @@ export function useActiveAcademicYear() {
   return useQuery<AcademicYear | null>({
     queryKey: [ACADEMIC_YEARS_QUERY_KEY, 'active'],
     queryFn: async () => {
-      const response = await fetch('/api/academic-years/active');
+      const response = await fetch('/api/academic-years/active', {
+        cache: 'no-store', // Don't cache API responses
+      });
       if (!response.ok) {
         if (response.status === 404) return null;
         throw new Error('Failed to fetch active academic year');
       }
       return response.json();
     },
-    staleTime: 0, // Always refetch on mount
+    staleTime: 0, // Always consider data stale
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
     gcTime: 5 * 60 * 1000,
   });
 }
@@ -82,14 +90,18 @@ export function useAcademicYear(id: string) {
   return useQuery<AcademicYear>({
     queryKey: [ACADEMIC_YEARS_QUERY_KEY, id],
     queryFn: async () => {
-      const response = await fetch(`/api/academic-years/${id}`);
+      const response = await fetch(`/api/academic-years/${id}`, {
+        cache: 'no-store', // Don't cache API responses
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch academic year');
       }
       return response.json();
     },
     enabled: !!id,
-    staleTime: 0, // Always refetch on mount
+    staleTime: 0, // Always consider data stale
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
     gcTime: 5 * 60 * 1000,
   });
 }

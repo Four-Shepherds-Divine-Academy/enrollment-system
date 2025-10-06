@@ -58,6 +58,11 @@ export default function PaymentHistoryPage() {
     paymentStatus: statusFilter,
   })
 
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Payment History'
+  }, [])
+
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -126,6 +131,24 @@ export default function PaymentHistoryPage() {
     )
   }
 
+  const getEnrollmentStatusBadge = (status: string | null | undefined) => {
+    // Default to PENDING if no enrollment status for current year
+    const displayStatus = status || 'PENDING'
+
+    const variants: Record<string, string> = {
+      ENROLLED: 'bg-green-100 text-green-700 border-green-300',
+      PENDING: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+      TRANSFERRED: 'bg-blue-100 text-blue-700 border-blue-300',
+      DROPPED: 'bg-gray-100 text-gray-700 border-gray-300',
+    }
+
+    return (
+      <Badge variant="outline" className={variants[displayStatus] || 'bg-gray-100 text-gray-700 border-gray-300'}>
+        {displayStatus}
+      </Badge>
+    )
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
@@ -143,15 +166,17 @@ export default function PaymentHistoryPage() {
     return acc
   }, {})
 
-  // Calculate statistics (using filtered data)
+  // Calculate statistics (using filtered data, excluding non-enrolled students from payment totals)
+  const enrolledRecords = filteredPaymentHistory.filter((r: any) => r.currentYearEnrollmentStatus === 'ENROLLED')
+
   const stats = {
     total: filteredPaymentHistory.length,
-    paid: filteredPaymentHistory.filter((r: any) => r.paymentStatus === 'PAID').length,
-    partial: filteredPaymentHistory.filter((r: any) => r.paymentStatus === 'PARTIAL').length,
-    unpaid: filteredPaymentHistory.filter((r: any) => r.paymentStatus === 'UNPAID').length,
-    late: filteredPaymentHistory.filter((r: any) => r.isLatePayment).length,
-    totalCollected: filteredPaymentHistory.reduce((sum: number, r: any) => sum + r.totalPaid, 0),
-    totalDue: filteredPaymentHistory.reduce((sum: number, r: any) => sum + r.totalDue, 0),
+    paid: enrolledRecords.filter((r: any) => r.paymentStatus === 'PAID').length,
+    partial: enrolledRecords.filter((r: any) => r.paymentStatus === 'PARTIAL').length,
+    unpaid: enrolledRecords.filter((r: any) => r.paymentStatus === 'UNPAID').length,
+    late: enrolledRecords.filter((r: any) => r.isLatePayment).length,
+    totalCollected: enrolledRecords.reduce((sum: number, r: any) => sum + r.totalPaid, 0),
+    totalDue: enrolledRecords.reduce((sum: number, r: any) => sum + r.totalDue, 0),
   }
 
   if (!activeYear) {
@@ -340,10 +365,11 @@ export default function PaymentHistoryPage() {
                     <TableRow>
                       <TableHead>Student Name</TableHead>
                       <TableHead>Contact</TableHead>
+                      <TableHead>Enrollment Status</TableHead>
                       <TableHead className="text-right">Total Due</TableHead>
                       <TableHead className="text-right">Total Paid</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Payment Status</TableHead>
                       <TableHead>Last Payment</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -351,12 +377,13 @@ export default function PaymentHistoryPage() {
                   <TableBody>
                     {records.map((record: any) => {
                       const daysOverdue = getDaysOverdue(record)
+                      const isNotEnrolled = record.currentYearEnrollmentStatus !== 'ENROLLED'
 
                       return (
-                        <TableRow key={record.id} className={record.isLatePayment ? 'bg-red-50' : ''}>
+                        <TableRow key={record.id} className={record.isLatePayment && !isNotEnrolled ? 'bg-red-50' : ''}>
                           <TableCell className="font-medium">
                             {record.student.fullName}
-                            {record.isLatePayment && (
+                            {record.isLatePayment && !isNotEnrolled && (
                               <div className="flex items-center gap-2 mt-1">
                                 <Badge variant="destructive" className="text-xs">
                                   LATE
@@ -372,22 +399,25 @@ export default function PaymentHistoryPage() {
                           <TableCell className="text-sm text-muted-foreground">
                             {record.student.contactNumber}
                           </TableCell>
+                          <TableCell>
+                            {getEnrollmentStatusBadge(record.currentYearEnrollmentStatus)}
+                          </TableCell>
                           <TableCell className="text-right font-medium">
-                            {formatCurrency(record.totalDue)}
+                            {isNotEnrolled ? '-' : formatCurrency(record.totalDue)}
                           </TableCell>
                           <TableCell className="text-right text-green-600 font-medium">
-                            {formatCurrency(record.totalPaid)}
+                            {isNotEnrolled ? '-' : formatCurrency(record.totalPaid)}
                           </TableCell>
                           <TableCell className={`text-right font-bold ${
-                            record.balance > 0 ? 'text-red-600' : 'text-green-600'
+                            isNotEnrolled ? '' : record.balance > 0 ? 'text-red-600' : 'text-green-600'
                           }`}>
-                            {formatCurrency(record.balance)}
+                            {isNotEnrolled ? '-' : formatCurrency(record.balance)}
                           </TableCell>
                           <TableCell>
-                            {getStatusBadge(record.paymentStatus)}
+                            {isNotEnrolled ? '-' : getStatusBadge(record.paymentStatus)}
                           </TableCell>
                           <TableCell className="text-sm">
-                            {record.lastPaymentDate
+                            {isNotEnrolled ? '-' : record.lastPaymentDate
                               ? format(new Date(record.lastPaymentDate), 'PP')
                               : '-'}
                           </TableCell>

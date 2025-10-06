@@ -17,16 +17,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const academicYear = searchParams.get('academicYear')
     const paymentStatus = searchParams.get('paymentStatus')
 
+    // Get active academic year
+    const activeYear = await prisma.academicYear.findFirst({
+      where: { isActive: true },
+    })
+
     const where: Prisma.StudentWhereInput = {}
 
     // Grade level filter
     if (gradeLevel && gradeLevel !== 'All Grades') {
       where.gradeLevel = gradeLevel
-    }
-
-    // Status filter
-    if (status && status !== 'All Status') {
-      where.enrollmentStatus = status
     }
 
     // Remark filter (searches in remarks field)
@@ -46,21 +46,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       ]
     }
 
-    // Academic year filter
-    if (academicYear && academicYear.trim() !== '') {
-      where.enrollments = {
-        some: {
-          schoolYear: academicYear
-        }
-      }
-    }
-
     // Payment status filter - only apply if explicitly selected (not 'All Payment Status')
     if (paymentStatus && paymentStatus.trim() !== '' && paymentStatus !== 'All Payment Status') {
       where.feeStatus = {
         some: {
           paymentStatus: paymentStatus,
-          ...(academicYear && academicYear.trim() !== '' ? { academicYearId: academicYear } : {}),
+          academicYearId: activeYear?.id,
         },
       }
     }
@@ -96,6 +87,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           select: {
             schoolYear: true,
             gradeLevel: true,
+            academicYearId: true,
             section: {
               select: {
                 id: true,
@@ -127,7 +119,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
     })
 
-    return NextResponse.json(students)
+    // Add current year enrollment status to each student
+    let studentsWithCurrentStatus = students.map(student => {
+      const currentYearEnrollment = student.enrollments.find(
+        e => e.academicYearId === activeYear?.id
+      )
+
+      return {
+        ...student,
+        currentYearEnrollmentStatus: currentYearEnrollment?.status || student.enrollmentStatus,
+      }
+    })
+
+    // Filter by status after adding current year enrollment status
+    if (status && status !== 'All Status') {
+      studentsWithCurrentStatus = studentsWithCurrentStatus.filter(
+        student => student.currentYearEnrollmentStatus === status
+      )
+    }
+
+    return NextResponse.json(studentsWithCurrentStatus)
   } catch (error) {
     console.error('Error fetching students:', error)
     return NextResponse.json(

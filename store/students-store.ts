@@ -109,7 +109,7 @@ export const useStudentsStore = create<StudentsStore>()(
     {
       name: 'students-filters',
       partialize: (state) => ({ filters: state.filters }),
-      version: 2,
+      version: 3,
       migrate: (persistedState: any, version: number) => {
         if (version === 0) {
           // Add remark field to old state
@@ -127,6 +127,15 @@ export const useStudentsStore = create<StudentsStore>()(
             filters: {
               ...persistedState.filters,
               paymentStatus: 'All Payment Status',
+            },
+          };
+        }
+        if (version === 2) {
+          // Reset status filter to show all students by default
+          return {
+            filters: {
+              ...persistedState.filters,
+              status: 'All Status',
             },
           };
         }

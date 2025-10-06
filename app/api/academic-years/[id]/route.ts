@@ -223,13 +223,45 @@ export async function DELETE(
       },
     })
 
-    // Delete all enrollments for this academic year (cascade should handle this, but being explicit)
+    // Delete all related records in the correct order to avoid foreign key constraints
+
+    // 1. Delete student fee statuses for this academic year
+    const deletedFeeStatuses = await prisma.studentFeeStatus.deleteMany({
+      where: { academicYearId: id }
+    })
+    console.log(`Deleted ${deletedFeeStatuses.count} student fee statuses`)
+
+    // 2. Delete payments for this academic year
+    const deletedPayments = await prisma.payment.deleteMany({
+      where: { academicYearId: id }
+    })
+    console.log(`Deleted ${deletedPayments.count} payments`)
+
+    // 3. Delete payment adjustments for this academic year
+    const deletedAdjustments = await prisma.paymentAdjustment.deleteMany({
+      where: { academicYearId: id }
+    })
+    console.log(`Deleted ${deletedAdjustments.count} payment adjustments`)
+
+    // 4. Delete refunds for this academic year
+    const deletedRefunds = await prisma.refund.deleteMany({
+      where: { academicYearId: id }
+    })
+    console.log(`Deleted ${deletedRefunds.count} refunds`)
+
+    // 5. Delete fee templates for this academic year
+    const deletedFeeTemplates = await prisma.feeTemplate.deleteMany({
+      where: { academicYearId: id }
+    })
+    console.log(`Deleted ${deletedFeeTemplates.count} fee templates`)
+
+    // 6. Delete enrollments for this academic year
     const deletedEnrollments = await prisma.enrollment.deleteMany({
       where: { academicYearId: id }
     })
     console.log(`Deleted ${deletedEnrollments.count} enrollments`)
 
-    // Delete the academic year itself
+    // 7. Finally, delete the academic year itself
     await prisma.academicYear.delete({
       where: { id }
     })
@@ -238,7 +270,12 @@ export async function DELETE(
     return NextResponse.json({
       message: 'Academic year and all related records deleted successfully',
       deletedYear: academicYear.name,
-      deletedEnrollments: deletedEnrollments.count
+      deletedEnrollments: deletedEnrollments.count,
+      deletedFeeStatuses: deletedFeeStatuses.count,
+      deletedPayments: deletedPayments.count,
+      deletedAdjustments: deletedAdjustments.count,
+      deletedRefunds: deletedRefunds.count,
+      deletedFeeTemplates: deletedFeeTemplates.count,
     })
   } catch (error) {
     console.error('Error deleting academic year:', error)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { Trash2, RotateCcw, Search, Filter, RefreshCw } from 'lucide-react'
 import {
@@ -53,6 +53,11 @@ export default function RecycleBinPage() {
   const restoreMutation = useRestoreItem()
   const deleteMutation = usePermanentlyDeleteItem()
   const cleanupMutation = useCleanupExpired()
+
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Recycle Bin'
+  }, [])
 
   const isAnyOperationInProgress =
     restoringItemId !== null ||

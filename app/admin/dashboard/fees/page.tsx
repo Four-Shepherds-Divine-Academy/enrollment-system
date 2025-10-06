@@ -126,6 +126,11 @@ export default function FeesManagementPage() {
     breakdowns?: { [key: number]: { description?: string; amount?: string } }
   }>({})
 
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Fee Management'
+  }, [])
+
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {

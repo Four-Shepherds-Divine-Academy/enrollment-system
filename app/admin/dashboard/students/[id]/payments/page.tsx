@@ -111,6 +111,11 @@ export default function StudentPaymentsPage() {
     }
   )
 
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Student Payments'
+  }, [])
+
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {

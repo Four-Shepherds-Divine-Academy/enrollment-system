@@ -1,6 +1,13 @@
+'use client'
+
+import { useEffect } from 'react'
 import { EnrollmentForm } from '@/components/enrollment-form'
 
 export default function AdminEnrollPage() {
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Enroll Student'
+  }, [])
   return (
     <div className="space-y-6">
       <div>

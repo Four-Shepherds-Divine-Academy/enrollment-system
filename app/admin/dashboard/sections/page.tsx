@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -98,6 +98,11 @@ export default function SectionsPage() {
     gradeLevel: '',
     isActive: true,
   });
+
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Sections'
+  }, [])
 
   const handleOpenModal = (section?: Section) => {
     if (section) {

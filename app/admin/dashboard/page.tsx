@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +13,11 @@ import {
   MapPin
 } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
+
+export const metadata: Metadata = {
+  title: '4SDA - Dashboard',
+  description: 'Admin Dashboard - Student Enrollment Management System',
+}
 
 // Force dynamic rendering - always fetch fresh data
 export const dynamic = 'force-dynamic'

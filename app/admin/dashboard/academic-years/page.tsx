@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -85,6 +85,11 @@ export default function AcademicYearsPage() {
   const [deletingYearId, setDeletingYearId] = useState<string | null>(null)
   const [updatingYearId, setUpdatingYearId] = useState<string | null>(null)
 
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Academic Years'
+  }, [])
+
   // Zustand store
   const { filters } = useAcademicYearsStore()
 
@@ -95,6 +100,16 @@ export default function AcademicYearsPage() {
   const updateMutation = useUpdateAcademicYear()
   const deleteMutation = useDeleteAcademicYear()
   const activateMutation = useActivateAcademicYear()
+
+  // Sort academic years: active year first, then by start date (newest first)
+  const sortedAcademicYears = [...academicYears].sort((a, b) => {
+    // Active year always comes first
+    if (a.isActive && !b.isActive) return -1
+    if (!a.isActive && b.isActive) return 1
+
+    // If both active or both inactive, sort by start date (newest first)
+    return new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+  })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -338,7 +353,7 @@ export default function AcademicYearsPage() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl">Academic Years</CardTitle>
             <Badge variant="secondary" className="text-sm">
-              {academicYears.length} {academicYears.length === 1 ? 'year' : 'years'}
+              {sortedAcademicYears.length} {sortedAcademicYears.length === 1 ? 'year' : 'years'}
             </Badge>
           </div>
         </CardHeader>
@@ -364,7 +379,7 @@ export default function AcademicYearsPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : academicYears.length === 0 ? (
+              ) : sortedAcademicYears.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
                   <TableCell colSpan={6} className="text-center py-12">
                     <p className="text-muted-foreground">
@@ -373,7 +388,7 @@ export default function AcademicYearsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                academicYears.map((year) => (
+                sortedAcademicYears.map((year) => (
                   <TableRow key={year.id}>
                     <TableCell className="font-medium">{year.name}</TableCell>
                     <TableCell>
@@ -635,7 +650,7 @@ export default function AcademicYearsPage() {
           open={showImportDialog}
           onOpenChange={setShowImportDialog}
           targetAcademicYear={importTargetYear}
-          availableYears={academicYears.filter((y) => y.id !== importTargetYear.id)}
+          availableYears={sortedAcademicYears.filter((y) => y.id !== importTargetYear.id)}
           onSuccess={() => {}}
         />
       )}
