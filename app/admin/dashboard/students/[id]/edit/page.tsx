@@ -114,6 +114,20 @@ export default function EditStudentPage() {
         province: student.province || '',
         zipCode: student.zipCode || '',
         parentGuardian: student.parentGuardian || '',
+        fatherName: student.fatherName || '',
+        fatherOccupation: student.fatherOccupation || '',
+        fatherEmployer: student.fatherEmployer || '',
+        fatherWorkContact: student.fatherWorkContact || '',
+        fatherMonthlySalary: student.fatherMonthlySalary || undefined,
+        motherName: student.motherName || '',
+        motherOccupation: student.motherOccupation || '',
+        motherEmployer: student.motherEmployer || '',
+        motherWorkContact: student.motherWorkContact || '',
+        motherMonthlySalary: student.motherMonthlySalary || undefined,
+        guardianRelationship: student.guardianRelationship || '',
+        emergencyContactName: student.emergencyContactName || '',
+        emergencyContactNumber: student.emergencyContactNumber || '',
+        emergencyContactRelationship: student.emergencyContactRelationship || '',
         gradeLevel: student.gradeLevel || '',
         enrollmentStatus: student.enrollmentStatus || 'PENDING',
         isTransferee: student.isTransferee || false,
@@ -154,9 +168,13 @@ export default function EditStudentPage() {
       { id: studentId, data },
       {
         onSuccess: () => {
-          toast.success('Student updated successfully')
+          // Query invalidation happens automatically in the mutation hook
+          // Redirect to students list page
           router.push('/admin/dashboard/students')
         },
+        onError: (error: any) => {
+          toast.error(error.message || 'Failed to update student')
+        }
       }
     )
   }
@@ -423,17 +441,17 @@ export default function EditStudentPage() {
               </div>
             </div>
 
-            {/* Contact & Guardian */}
+            {/* Contact Information */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b">
-                <h3 className="font-semibold text-base text-gray-900">Contact & Guardian Information</h3>
+                <h3 className="font-semibold text-base text-gray-900">Contact Information</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="contactNumber">
                     Contact Number <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="contactNumber" {...register('contactNumber')} />
+                  <Input id="contactNumber" {...register('contactNumber')} placeholder="09123456789 or +639123456789" />
                   {errors.contactNumber && (
                     <p className="text-sm text-red-500 mt-1">
                       {errors.contactNumber.message}
@@ -444,11 +462,180 @@ export default function EditStudentPage() {
                   <Label htmlFor="parentGuardian">
                     Parent/Guardian <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="parentGuardian" {...register('parentGuardian')} />
+                  <Input id="parentGuardian" {...register('parentGuardian')} placeholder="Primary contact person" />
                   {errors.parentGuardian && (
                     <p className="text-sm text-red-500 mt-1">
                       {errors.parentGuardian.message}
                     </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Father's Information */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <h3 className="font-semibold text-base text-gray-900">Father's Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="fatherName">Full Name</Label>
+                  <Input id="fatherName" {...register('fatherName')} maxLength={100} />
+                  {errors.fatherName && (
+                    <p className="text-sm text-red-500 mt-1">{errors.fatherName.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="fatherOccupation">Occupation</Label>
+                  <Input id="fatherOccupation" {...register('fatherOccupation')} maxLength={100} />
+                  {errors.fatherOccupation && (
+                    <p className="text-sm text-red-500 mt-1">{errors.fatherOccupation.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="fatherEmployer">Employer/Company Name</Label>
+                  <Input id="fatherEmployer" {...register('fatherEmployer')} maxLength={150} />
+                  {errors.fatherEmployer && (
+                    <p className="text-sm text-red-500 mt-1">{errors.fatherEmployer.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="fatherWorkContact">Work Contact Number</Label>
+                  <Input id="fatherWorkContact" {...register('fatherWorkContact')} maxLength={13} />
+                  {errors.fatherWorkContact && (
+                    <p className="text-sm text-red-500 mt-1">{errors.fatherWorkContact.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="fatherMonthlySalary">Monthly Income/Salary (₱)</Label>
+                  <Input
+                    id="fatherMonthlySalary"
+                    type="number"
+                    min="1"
+                    max="10000000"
+                    step="0.01"
+                    {...register('fatherMonthlySalary', {
+                      setValueAs: (v) => v === '' ? undefined : Number(v)
+                    })}
+                  />
+                  {errors.fatherMonthlySalary && (
+                    <p className="text-sm text-red-500 mt-1">{errors.fatherMonthlySalary.message}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Mother's Information */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <h3 className="font-semibold text-base text-gray-900">Mother's Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="motherName">Full Name</Label>
+                  <Input id="motherName" {...register('motherName')} maxLength={100} />
+                  {errors.motherName && (
+                    <p className="text-sm text-red-500 mt-1">{errors.motherName.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="motherOccupation">Occupation</Label>
+                  <Input id="motherOccupation" {...register('motherOccupation')} maxLength={100} />
+                  {errors.motherOccupation && (
+                    <p className="text-sm text-red-500 mt-1">{errors.motherOccupation.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="motherEmployer">Employer/Company Name</Label>
+                  <Input id="motherEmployer" {...register('motherEmployer')} maxLength={150} />
+                  {errors.motherEmployer && (
+                    <p className="text-sm text-red-500 mt-1">{errors.motherEmployer.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="motherWorkContact">Work Contact Number</Label>
+                  <Input id="motherWorkContact" {...register('motherWorkContact')} maxLength={13} />
+                  {errors.motherWorkContact && (
+                    <p className="text-sm text-red-500 mt-1">{errors.motherWorkContact.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="motherMonthlySalary">Monthly Income/Salary (₱)</Label>
+                  <Input
+                    id="motherMonthlySalary"
+                    type="number"
+                    min="1"
+                    max="10000000"
+                    step="0.01"
+                    {...register('motherMonthlySalary', {
+                      setValueAs: (v) => v === '' ? undefined : Number(v)
+                    })}
+                  />
+                  {errors.motherMonthlySalary && (
+                    <p className="text-sm text-red-500 mt-1">{errors.motherMonthlySalary.message}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Guardian Information */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <h3 className="font-semibold text-base text-gray-900">Guardian Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="guardianRelationship">Guardian Relationship to Student</Label>
+                  <Select
+                    onValueChange={(value) => setValue('guardianRelationship', value)}
+                    defaultValue={student?.guardianRelationship || ''}
+                  >
+                    <SelectTrigger className="h-10 w-full">
+                      <SelectValue placeholder="Select relationship" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Father">Father</SelectItem>
+                      <SelectItem value="Mother">Mother</SelectItem>
+                      <SelectItem value="Grandfather">Grandfather</SelectItem>
+                      <SelectItem value="Grandmother">Grandmother</SelectItem>
+                      <SelectItem value="Uncle">Uncle</SelectItem>
+                      <SelectItem value="Aunt">Aunt</SelectItem>
+                      <SelectItem value="Sibling">Sibling</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.guardianRelationship && (
+                    <p className="text-sm text-red-500 mt-1">{errors.guardianRelationship.message}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Emergency Contact */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <h3 className="font-semibold text-base text-gray-900">Emergency Contact Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="emergencyContactName">Contact Name</Label>
+                  <Input id="emergencyContactName" {...register('emergencyContactName')} maxLength={100} />
+                  {errors.emergencyContactName && (
+                    <p className="text-sm text-red-500 mt-1">{errors.emergencyContactName.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="emergencyContactNumber">Contact Number</Label>
+                  <Input id="emergencyContactNumber" {...register('emergencyContactNumber')} maxLength={13} />
+                  {errors.emergencyContactNumber && (
+                    <p className="text-sm text-red-500 mt-1">{errors.emergencyContactNumber.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="emergencyContactRelationship">Relationship to Student</Label>
+                  <Input id="emergencyContactRelationship" {...register('emergencyContactRelationship')} maxLength={50} />
+                  {errors.emergencyContactRelationship && (
+                    <p className="text-sm text-red-500 mt-1">{errors.emergencyContactRelationship.message}</p>
                   )}
                 </div>
               </div>

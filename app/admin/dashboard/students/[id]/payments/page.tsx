@@ -458,7 +458,41 @@ export default function StudentPaymentsPage() {
 
   const handlePayFullBalance = () => {
     if (adjustedBalance > 0) {
-      setPaymentAmount(formatNumberInput(adjustedBalance.toString()))
+      // Automatically select all unpaid/partially paid line items
+      const selectedItems: Record<string, number> = {}
+
+      // Add base fee breakdowns that aren't fully paid
+      if (feeStatus?.feeTemplate?.breakdowns) {
+        feeStatus.feeTemplate.breakdowns.forEach((breakdown: any) => {
+          const paidAmount = paidByBreakdown[breakdown.id] || 0
+          const remainingBalance = breakdown.amount - paidAmount
+
+          // Only include items with remaining balance
+          if (remainingBalance > 0) {
+            selectedItems[breakdown.id] = remainingBalance
+          }
+        })
+      }
+
+      // Add unpaid/partially paid optional fees
+      studentOptionalFees
+        .filter((fee: any) => !fee.isPaid || (fee.paidAmount < fee.amount))
+        .forEach((optFee: any) => {
+          const paidAmount = optFee.paidAmount || 0
+          const remainingBalance = optFee.amount - paidAmount
+          if (remainingBalance > 0) {
+            selectedItems[`optional-${optFee.id}`] = remainingBalance
+          }
+        })
+
+      // Set selected line items
+      setSelectedLineItems(selectedItems)
+
+      // Calculate and set total amount
+      const totalAmount = Object.values(selectedItems).reduce((sum, amount) => sum + amount, 0)
+      setPaymentAmount(formatNumberInput(totalAmount.toString()))
+
+      // Open payment dialog
       setPaymentDialogOpen(true)
     }
   }

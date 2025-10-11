@@ -3,6 +3,288 @@ import { SECTION_DEFINITIONS } from '@/prisma/seed-helpers'
 import { STUDENT_REMARK_CATEGORIES } from './constants/student-remarks'
 
 /**
+ * Default fee template structure for all grade levels
+ * Used as fallback when no previous academic year templates exist
+ */
+const DEFAULT_FEE_TEMPLATES = [
+  // K1-K2 Template
+  {
+    gradeLevel: 'Kinder 1',
+    name: 'Kinder 1 - Cash Scheme',
+    description: 'Full payment scheme for Kinder 1',
+    totalAmount: 22600.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules - Reading, Language, Math', amount: 2100.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning Materials GMRC/Other Activities', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee (included aircon fee)', amount: 5800.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 6500.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  {
+    gradeLevel: 'Kinder 2',
+    name: 'Kinder 2 - Cash Scheme',
+    description: 'Full payment scheme for Kinder 2',
+    totalAmount: 22600.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules - Reading, Language, Math', amount: 2100.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning Materials GMRC/Other Activities', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee (included aircon fee)', amount: 5800.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 6500.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  // Grade 1-3 Templates
+  {
+    gradeLevel: 'Grade 1',
+    name: 'Grade 1 - Cash Scheme',
+    description: 'Full payment scheme for Grade 1',
+    totalAmount: 25900.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules - Reading, Language, Math, Makabansa, Filipino, GMRC', amount: 4900.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee', amount: 5800.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 7000.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  {
+    gradeLevel: 'Grade 2',
+    name: 'Grade 2 - Cash Scheme',
+    description: 'Full payment scheme for Grade 2',
+    totalAmount: 25900.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules - Reading, Language, Math, Makabansa, Filipino, GMRC', amount: 4900.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee', amount: 5800.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 7000.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  {
+    gradeLevel: 'Grade 3',
+    name: 'Grade 3 - Cash Scheme',
+    description: 'Full payment scheme for Grade 3',
+    totalAmount: 25900.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules - Reading, Language, Math, Makabansa, Filipino, GMRC', amount: 4900.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee', amount: 5800.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 7000.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  // Grade 4-6 Templates
+  {
+    gradeLevel: 'Grade 4',
+    name: 'Grade 4 - Cash Scheme',
+    description: 'Full payment scheme for Grade 4',
+    totalAmount: 26600.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules', amount: 4900.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee', amount: 6000.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 7500.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  {
+    gradeLevel: 'Grade 5',
+    name: 'Grade 5 - Cash Scheme',
+    description: 'Full payment scheme for Grade 5',
+    totalAmount: 26600.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules', amount: 4900.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee', amount: 6000.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 7500.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  {
+    gradeLevel: 'Grade 6',
+    name: 'Grade 6 - Cash Scheme',
+    description: 'Full payment scheme for Grade 6',
+    totalAmount: 26600.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules', amount: 4900.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee', amount: 6000.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 7500.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  // JHS Grade 7
+  {
+    gradeLevel: 'Grade 7',
+    name: 'Grade 7 - Cash Scheme',
+    description: 'Full payment scheme for Grade 7',
+    totalAmount: 27800.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules', amount: 5600.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee', amount: 6000.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 8000.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  // Grade 8-10 Templates
+  {
+    gradeLevel: 'Grade 8',
+    name: 'Grade 8 - Cash Scheme',
+    description: 'Full payment scheme for Grade 8',
+    totalAmount: 27800.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules', amount: 5600.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee', amount: 6000.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 8000.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  {
+    gradeLevel: 'Grade 9',
+    name: 'Grade 9 - Cash Scheme',
+    description: 'Full payment scheme for Grade 9',
+    totalAmount: 27800.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules', amount: 5600.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee', amount: 6000.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 8000.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+  {
+    gradeLevel: 'Grade 10',
+    name: 'Grade 10 - Cash Scheme',
+    description: 'Full payment scheme for Grade 10',
+    totalAmount: 27800.00,
+    breakdowns: [
+      { description: 'Entrance Fee', amount: 3000.00, category: 'REGISTRATION', order: 0, isRefundable: false },
+      { description: 'Modules', amount: 5600.00, category: 'BOOKS', order: 1, isRefundable: true },
+      { description: 'Supplementary Learning', amount: 700.00, category: 'BOOKS', order: 2, isRefundable: true },
+      { description: 'Miscellaneous', amount: 4500.00, category: 'MISC', order: 3, isRefundable: true },
+      { description: 'Other Fee', amount: 6000.00, category: 'MISC', order: 4, isRefundable: true },
+      { description: 'Tuition Fee', amount: 8000.00, category: 'TUITION', order: 5, isRefundable: false },
+    ],
+  },
+]
+
+/**
+ * Default optional fees structure
+ * Used as fallback when no previous academic year optional fees exist
+ */
+const DEFAULT_OPTIONAL_FEES = [
+  {
+    name: 'School ID',
+    description: 'Official school identification card',
+    amount: 250.00,
+    category: 'ID_CARD',
+    hasVariations: false,
+    applicableGradeLevels: [],
+    sortOrder: 1,
+    variations: [],
+  },
+  {
+    name: 'PE Uniform',
+    description: 'Physical education uniform set',
+    amount: 1150.00,
+    category: 'UNIFORM',
+    hasVariations: false,
+    applicableGradeLevels: [],
+    sortOrder: 2,
+    variations: [],
+  },
+  {
+    name: 'Foundation T-Shirt',
+    description: 'Official foundation t-shirt',
+    amount: 250.00,
+    category: 'UNIFORM',
+    hasVariations: false,
+    applicableGradeLevels: [],
+    sortOrder: 3,
+    variations: [],
+  },
+  {
+    name: 'Daily Uniform',
+    description: 'Official daily school uniform (price varies by gender and sleeve type)',
+    amount: null,
+    category: 'UNIFORM',
+    hasVariations: true,
+    applicableGradeLevels: [],
+    sortOrder: 4,
+    variations: [
+      { name: 'Girl - Short Sleeve', amount: 1173.00 },
+      { name: 'Boy - Short Sleeve', amount: 1193.00 },
+      { name: 'Girl - Long Sleeve', amount: 1248.00 },
+      { name: 'Boy - Long Sleeve', amount: 1268.00 },
+    ],
+  },
+  {
+    name: 'Graduation Fee',
+    description: 'Graduation ceremony and related expenses',
+    amount: 2650.00,
+    category: 'GRADUATION',
+    hasVariations: false,
+    applicableGradeLevels: ['Kinder 2', 'Grade 6', 'Grade 10'],
+    sortOrder: 5,
+    variations: [],
+  },
+  {
+    name: 'Recognition Fee',
+    description: 'Recognition ceremony expenses',
+    amount: 850.00,
+    category: 'MISCELLANEOUS',
+    hasVariations: false,
+    applicableGradeLevels: [],
+    sortOrder: 6,
+    variations: [],
+  },
+  {
+    name: 'Form 137 (Transfer)',
+    description: 'Form 137 for students planning to transfer',
+    amount: 400.00,
+    category: 'CERTIFICATION',
+    hasVariations: false,
+    applicableGradeLevels: [],
+    sortOrder: 7,
+    variations: [],
+  },
+  {
+    name: 'Certifications',
+    description: 'Various school certifications',
+    amount: 100.00,
+    category: 'CERTIFICATION',
+    hasVariations: false,
+    applicableGradeLevels: [],
+    sortOrder: 8,
+    variations: [],
+  },
+  {
+    name: 'Notebook',
+    description: 'School notebook (price per piece)',
+    amount: 50.00,
+    category: 'BOOKS',
+    hasVariations: false,
+    applicableGradeLevels: [],
+    sortOrder: 9,
+    variations: [],
+  },
+]
+
+/**
  * Copies fee templates from the most recent academic year to a new academic year
  * @param newAcademicYearId - The ID of the new academic year
  * @returns The number of fee templates copied
@@ -26,11 +308,6 @@ export async function copyFeeTemplatesFromMostRecent(newAcademicYearId: string):
       },
     })
 
-    if (!mostRecentYear || mostRecentYear.feeTemplates.length === 0) {
-      console.log('No previous fee templates found to copy')
-      return 0
-    }
-
     // Get the new academic year
     const newAcademicYear = await prisma.academicYear.findUnique({
       where: { id: newAcademicYearId },
@@ -41,9 +318,23 @@ export async function copyFeeTemplatesFromMostRecent(newAcademicYearId: string):
     }
 
     let copiedCount = 0
+    let templatesSource: any[] = []
 
-    // Copy each fee template and its breakdowns
-    for (const template of mostRecentYear.feeTemplates) {
+    // Determine source of templates: previous year or defaults
+    if (!mostRecentYear || mostRecentYear.feeTemplates.length === 0) {
+      console.log('No previous fee templates found. Using default templates.')
+      // Use default templates and update names with the new academic year
+      templatesSource = DEFAULT_FEE_TEMPLATES.map(template => ({
+        ...template,
+        name: template.name.replace('Cash Scheme', `Cash Scheme ${newAcademicYear.name}`),
+      }))
+    } else {
+      console.log(`Copying templates from ${mostRecentYear.name}`)
+      templatesSource = mostRecentYear.feeTemplates
+    }
+
+    // Copy or create each fee template and its breakdowns
+    for (const template of templatesSource) {
       // Check if a fee template already exists for this grade level in the new year
       const existingTemplate = await prisma.feeTemplate.findUnique({
         where: {
@@ -60,28 +351,33 @@ export async function copyFeeTemplatesFromMostRecent(newAcademicYearId: string):
       }
 
       // Create the new fee template with breakdowns
+      // Check if template is from previous year (has id) or default (no id)
+      const templateName = mostRecentYear
+        ? template.name.replace(mostRecentYear.name, newAcademicYear.name)
+        : template.name
+
       await prisma.feeTemplate.create({
         data: {
-          name: template.name.replace(mostRecentYear.name, newAcademicYear.name),
+          name: templateName,
           gradeLevel: template.gradeLevel,
           academicYearId: newAcademicYearId,
           totalAmount: template.totalAmount,
-          isActive: template.isActive,
-          description: template.description,
+          isActive: template.isActive ?? true,
+          description: template.description || null,
           breakdowns: {
-            create: template.breakdowns.map((breakdown) => ({
+            create: template.breakdowns.map((breakdown: any) => ({
               description: breakdown.description,
               amount: breakdown.amount,
               category: breakdown.category,
               order: breakdown.order,
-              isRefundable: breakdown.isRefundable,
+              isRefundable: breakdown.isRefundable ?? true,
             })),
           },
         },
       })
 
       copiedCount++
-      console.log(`✓ Copied fee template for ${template.gradeLevel}`)
+      console.log(`✓ Created fee template for ${template.gradeLevel}`)
     }
 
     return copiedCount
@@ -115,15 +411,20 @@ export async function copyOptionalFeesFromMostRecent(newAcademicYearId: string):
       },
     })
 
+    let copiedCount = 0
+    let feesSource: any[] = []
+
+    // Determine source of optional fees: previous year or defaults
     if (!mostRecentYear || mostRecentYear.optionalFees.length === 0) {
-      console.log('No previous optional fees found to copy')
-      return 0
+      console.log('No previous optional fees found. Using default optional fees.')
+      feesSource = DEFAULT_OPTIONAL_FEES
+    } else {
+      console.log(`Copying optional fees from ${mostRecentYear.name}`)
+      feesSource = mostRecentYear.optionalFees
     }
 
-    let copiedCount = 0
-
-    // Copy each optional fee and its variations
-    for (const optionalFee of mostRecentYear.optionalFees) {
+    // Copy or create each optional fee and its variations
+    for (const optionalFee of feesSource) {
       // Check if an optional fee already exists with the same name in the new year
       const existingFee = await prisma.optionalFee.findFirst({
         where: {
@@ -138,28 +439,33 @@ export async function copyOptionalFeesFromMostRecent(newAcademicYearId: string):
       }
 
       // Create the new optional fee with variations
-      await prisma.optionalFee.create({
-        data: {
-          name: optionalFee.name,
-          description: optionalFee.description,
-          amount: optionalFee.amount,
-          category: optionalFee.category,
-          hasVariations: optionalFee.hasVariations,
-          applicableGradeLevels: optionalFee.applicableGradeLevels,
-          isActive: optionalFee.isActive,
-          academicYearId: newAcademicYearId,
-          sortOrder: optionalFee.sortOrder,
-          variations: {
-            create: optionalFee.variations.map((variation) => ({
+      // Handle both database objects and default objects
+      const variationsData = optionalFee.variations && optionalFee.variations.length > 0
+        ? {
+            create: optionalFee.variations.map((variation: any) => ({
               name: variation.name,
               amount: variation.amount,
             })),
-          },
+          }
+        : undefined
+
+      await prisma.optionalFee.create({
+        data: {
+          name: optionalFee.name,
+          description: optionalFee.description || null,
+          amount: optionalFee.amount,
+          category: optionalFee.category,
+          hasVariations: optionalFee.hasVariations ?? false,
+          applicableGradeLevels: optionalFee.applicableGradeLevels ?? [],
+          isActive: optionalFee.isActive ?? true,
+          academicYearId: newAcademicYearId,
+          sortOrder: optionalFee.sortOrder ?? 0,
+          variations: variationsData,
         },
       })
 
       copiedCount++
-      console.log(`✓ Copied optional fee: ${optionalFee.name}`)
+      console.log(`✓ Created optional fee: ${optionalFee.name}`)
     }
 
     return copiedCount
@@ -292,8 +598,8 @@ export async function prepopulateAcademicYearData(academicYearId: string) {
     console.log('=== Prepopulation Summary ===')
     console.log(`Sections created: ${sectionsCreated}`)
     console.log(`Custom remarks created: ${remarksCreated}`)
-    console.log(`Fee templates copied: ${feeTemplatesCopied}`)
-    console.log(`Optional fees copied: ${optionalFeesCopied}`)
+    console.log(`Fee templates created: ${feeTemplatesCopied}`)
+    console.log(`Optional fees created: ${optionalFeesCopied}`)
     console.log(`Total actions: ${summary.totalActions}`)
 
     return summary

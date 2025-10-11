@@ -237,31 +237,37 @@ export async function DELETE(
     })
     console.log(`Deleted ${deletedPayments.count} payments`)
 
-    // 3. Delete payment adjustments for this academic year
+    // 3. Delete student optional fees for this academic year
+    const deletedOptionalFees = await prisma.studentOptionalFee.deleteMany({
+      where: { academicYearId: id }
+    })
+    console.log(`Deleted ${deletedOptionalFees.count} student optional fees`)
+
+    // 4. Delete payment adjustments for this academic year
     const deletedAdjustments = await prisma.paymentAdjustment.deleteMany({
       where: { academicYearId: id }
     })
     console.log(`Deleted ${deletedAdjustments.count} payment adjustments`)
 
-    // 4. Delete refunds for this academic year
+    // 5. Delete refunds for this academic year
     const deletedRefunds = await prisma.refund.deleteMany({
       where: { academicYearId: id }
     })
     console.log(`Deleted ${deletedRefunds.count} refunds`)
 
-    // 5. Delete fee templates for this academic year
+    // 6. Delete fee templates for this academic year
     const deletedFeeTemplates = await prisma.feeTemplate.deleteMany({
       where: { academicYearId: id }
     })
     console.log(`Deleted ${deletedFeeTemplates.count} fee templates`)
 
-    // 6. Delete enrollments for this academic year
+    // 7. Delete enrollments for this academic year
     const deletedEnrollments = await prisma.enrollment.deleteMany({
       where: { academicYearId: id }
     })
     console.log(`Deleted ${deletedEnrollments.count} enrollments`)
 
-    // 7. Finally, delete the academic year itself
+    // 8. Finally, delete the academic year itself
     await prisma.academicYear.delete({
       where: { id }
     })
@@ -273,6 +279,7 @@ export async function DELETE(
       deletedEnrollments: deletedEnrollments.count,
       deletedFeeStatuses: deletedFeeStatuses.count,
       deletedPayments: deletedPayments.count,
+      deletedOptionalFees: deletedOptionalFees.count,
       deletedAdjustments: deletedAdjustments.count,
       deletedRefunds: deletedRefunds.count,
       deletedFeeTemplates: deletedFeeTemplates.count,

@@ -26,7 +26,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useActiveAcademicYear } from '@/hooks/use-academic-years'
 import { useStudentSearch, useCreateStudent } from '@/hooks/use-students'
 import { useSections } from '@/hooks/use-sections'
@@ -72,6 +72,12 @@ export function EnrollmentForm() {
   const [manualSearchQuery, setManualSearchQuery] = useState('')
   const [manualSearchResults, setManualSearchResults] = useState<any[]>([])
   const [isManualSearching, setIsManualSearching] = useState(false)
+
+  // Refs for form sections to enable scroll-to-error
+  const personalInfoRef = useRef<HTMLDivElement>(null)
+  const contactAddressRef = useRef<HTMLDivElement>(null)
+  const parentGuardianRef = useRef<HTMLDivElement>(null)
+  const academicInfoRef = useRef<HTMLDivElement>(null)
 
   // React Query hooks
   const { data: activeYear, isLoading: loadingActiveYear } = useActiveAcademicYear()
@@ -259,6 +265,32 @@ export function EnrollmentForm() {
     }
   }, [selectedStudentId, matchingStudents, form])
 
+  // Scroll to first error field
+  const scrollToError = () => {
+    const errors = form.formState.errors
+
+    // Define field order and their corresponding refs
+    const fieldSections = [
+      { fields: ['lrn', 'firstName', 'middleName', 'lastName', 'gender', 'dateOfBirth'], ref: personalInfoRef },
+      { fields: ['contactNumber', 'houseNumber', 'street', 'subdivision', 'barangay', 'city', 'province', 'zipCode'], ref: contactAddressRef },
+      { fields: ['parentGuardian', 'fatherName', 'fatherOccupation', 'fatherEmployer', 'fatherWorkContact', 'fatherMonthlySalary', 'motherName', 'motherOccupation', 'motherEmployer', 'motherWorkContact', 'motherMonthlySalary', 'guardianRelationship', 'emergencyContactName', 'emergencyContactNumber', 'emergencyContactRelationship'], ref: parentGuardianRef },
+      { fields: ['gradeLevel', 'section', 'isTransferee', 'previousSchool', 'remarks'], ref: academicInfoRef },
+    ]
+
+    // Find the first section with an error
+    for (const section of fieldSections) {
+      const hasError = section.fields.some(field => errors[field as keyof typeof errors])
+      if (hasError && section.ref.current) {
+        section.ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        // Add a small offset to account for sticky headers
+        setTimeout(() => {
+          window.scrollBy(0, -100)
+        }, 300)
+        break
+      }
+    }
+  }
+
   const onSubmit = (data: StudentFormData) => {
     createMutation.mutate(data, {
       onSuccess: (result) => {
@@ -301,7 +333,7 @@ export function EnrollmentForm() {
           </div>
         ) : (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit, scrollToError)} className="space-y-6">
               {/* Previously Enrolled Checkbox */}
               <Card className="border-blue-200 bg-blue-50/50">
                 <CardContent className="pt-6">
@@ -455,7 +487,7 @@ export function EnrollmentForm() {
             )}
 
             {/* Personal Information */}
-            <div className="space-y-4">
+            <div ref={personalInfoRef} className="space-y-4">
               <h3 className="text-lg font-semibold">Personal Information</h3>
 
               <FormField
@@ -564,7 +596,7 @@ export function EnrollmentForm() {
             </div>
 
             {/* Contact & Address Information */}
-            <div className="space-y-4">
+            <div ref={contactAddressRef} className="space-y-4">
               <h3 className="text-lg font-semibold">Contact & Address Information</h3>
 
               <FormField
@@ -758,7 +790,7 @@ export function EnrollmentForm() {
             </div>
 
             {/* Parent/Guardian Information */}
-            <div className="space-y-4">
+            <div ref={parentGuardianRef} className="space-y-4">
               <h3 className="text-lg font-semibold">Parent/Guardian Information</h3>
 
               <FormField
@@ -1045,7 +1077,7 @@ export function EnrollmentForm() {
             </div>
 
             {/* Academic Information */}
-            <div className="space-y-4">
+            <div ref={academicInfoRef} className="space-y-4">
               <h3 className="text-lg font-semibold">Academic Information</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
