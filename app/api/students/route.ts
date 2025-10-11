@@ -16,13 +16,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const remark = searchParams.get('remark')
     const academicYear = searchParams.get('academicYear')
     const paymentStatus = searchParams.get('paymentStatus')
+    const includeAllYears = searchParams.get('includeAllYears') === 'true' // For archive page
 
     // Get active academic year
     const activeYear = await prisma.academicYear.findFirst({
       where: { isActive: true },
     })
 
+    if (!activeYear && !includeAllYears) {
+      return NextResponse.json([])
+    }
+
     const where: Prisma.StudentWhereInput = {}
+
+    // CRITICAL: Only show students enrolled in the active academic year
+    if (!includeAllYears && activeYear) {
+      where.enrollments = {
+        some: {
+          academicYearId: activeYear.id,
+        },
+      }
+    }
 
     // Grade level filter
     if (gradeLevel && gradeLevel !== 'All Grades') {
@@ -46,12 +60,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       ]
     }
 
-    // Payment status filter - only apply if explicitly selected (not 'All Payment Status')
-    if (paymentStatus && paymentStatus.trim() !== '' && paymentStatus !== 'All Payment Status') {
+    // Payment status filter - only apply if explicitly selected (not 'All Payment Status') and there's an active year
+    if (paymentStatus && paymentStatus.trim() !== '' && paymentStatus !== 'All Payment Status' && activeYear) {
       where.feeStatus = {
         some: {
           paymentStatus: paymentStatus,
-          academicYearId: activeYear?.id,
+          academicYearId: activeYear.id,
         },
       }
     }
@@ -75,6 +89,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         subdivision: true,
         barangay: true,
         parentGuardian: true,
+        fatherName: true,
+        fatherOccupation: true,
+        fatherEmployer: true,
+        fatherWorkContact: true,
+        fatherMonthlySalary: true,
+        motherName: true,
+        motherOccupation: true,
+        motherEmployer: true,
+        motherWorkContact: true,
+        motherMonthlySalary: true,
+        guardianRelationship: true,
+        emergencyContactName: true,
+        emergencyContactNumber: true,
+        emergencyContactRelationship: true,
         remarks: true,
         section: {
           select: {

@@ -1,0 +1,15 @@
+-- AlterTable
+ALTER TABLE "Student" ADD COLUMN     "emergencyContactName" TEXT,
+ADD COLUMN     "emergencyContactNumber" TEXT,
+ADD COLUMN     "emergencyContactRelationship" TEXT,
+ADD COLUMN     "fatherEmployer" TEXT,
+ADD COLUMN     "fatherMonthlySalary" DOUBLE PRECISION,
+ADD COLUMN     "fatherName" TEXT,
+ADD COLUMN     "fatherOccupation" TEXT,
+ADD COLUMN     "fatherWorkContact" TEXT,
+ADD COLUMN     "guardianRelationship" TEXT,
+ADD COLUMN     "motherEmployer" TEXT,
+ADD COLUMN     "motherMonthlySalary" DOUBLE PRECISION,
+ADD COLUMN     "motherName" TEXT,
+ADD COLUMN     "motherOccupation" TEXT,
+ADD COLUMN     "motherWorkContact" TEXT;

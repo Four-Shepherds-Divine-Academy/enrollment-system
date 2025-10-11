@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -20,7 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Search, X, Loader2 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 
 type Student = {
   id: string
@@ -28,7 +30,11 @@ type Student = {
   fullName: string
   gender: string
   gradeLevel: string
-  section: string | null
+  section: {
+    id: string
+    name: string
+    gradeLevel: string
+  } | null
   contactNumber: string
   houseNumber: string | null
   street: string | null
@@ -40,6 +46,12 @@ type Student = {
   enrollments: Array<{
     schoolYear: string
     gradeLevel: string
+    status: string
+    section: {
+      id: string
+      name: string
+      gradeLevel: string
+    } | null
   }>
 }
 
@@ -47,50 +59,104 @@ type AcademicYear = {
   id: string
   name: string
   isActive: boolean
-
 }
+
+const GRADE_LEVELS = [
+  'All Grades',
+  'Kinder 1',
+  'Kinder 2',
+  'Grade 1',
+  'Grade 2',
+  'Grade 3',
+  'Grade 4',
+  'Grade 5',
+  'Grade 6',
+  'Grade 7',
+  'Grade 8',
+  'Grade 9',
+  'Grade 10',
+]
 
 export default function StudentsArchivePage() {
   const [selectedYearId, setSelectedYearId] = useState<string>('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [gradeLevelFilter, setGradeLevelFilter] = useState('All Grades')
 
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // Reset search when year changes
+  useEffect(() => {
+    setSearchQuery('')
+    setDebouncedSearch('')
+    setGradeLevelFilter('All Grades')
+  }, [selectedYearId])
+
+  // Set page title
+  useEffect(() => {
+    document.title = '4SDA - Student Archive'
+  }, [])
+
+  // Fetch academic years with caching
   const { data: academicYears = [] } = useQuery<AcademicYear[]>({
     queryKey: ['academic-years'],
     queryFn: async () => {
       const response = await fetch('/api/academic-years')
-      if (!response.ok) throw new Error('Failed to fetch')
+      if (!response.ok) throw new Error('Failed to fetch academic years')
       return response.json()
     },
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   })
 
-  const { data: students = [], isLoading } = useQuery<Student[]>({
-    queryKey: ['students'],
+  // Fetch archived students with server-side filtering
+  const { data: students = [], isLoading, isFetching } = useQuery<Student[]>({
+    queryKey: ['students-archive', selectedYearId, debouncedSearch, gradeLevelFilter],
     queryFn: async () => {
-      const response = await fetch('/api/students')
-      if (!response.ok) throw new Error('Failed to fetch')
+      if (!selectedYearId) return []
+
+      const params = new URLSearchParams({
+        academicYearId: selectedYearId,
+      })
+
+      if (debouncedSearch) {
+        params.append('search', debouncedSearch)
+      }
+
+      if (gradeLevelFilter !== 'All Grades') {
+        params.append('gradeLevel', gradeLevelFilter)
+      }
+
+      const response = await fetch(`/api/students/archive?${params.toString()}`)
+      if (!response.ok) throw new Error('Failed to fetch students')
       return response.json()
     },
+    enabled: !!selectedYearId, // Only fetch when year is selected
+    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   })
 
   // Get past academic years (not active)
   const pastYears = academicYears.filter((y) => !y.isActive)
   const selectedYear = academicYears.find((y) => y.id === selectedYearId)
 
-  // Filter students by selected year
-  const filteredStudents = selectedYearId
-    ? students.filter((student) =>
-        student.enrollments.some((e) => e.schoolYear === selectedYear?.name)
-      )
-    : []
-
   // Group students by grade level and section
-  const groupedStudents = filteredStudents.reduce((acc, student) => {
-    const key = `${student.gradeLevel}${student.section ? ` - ${student.section}` : ''}`
+  const groupedStudents = students.reduce((acc, student) => {
+    const sectionName = student.enrollments[0]?.section?.name || student.section?.name
+    const key = `${student.gradeLevel}${sectionName ? ` - ${sectionName}` : ''}`
     if (!acc[key]) {
       acc[key] = []
     }
     acc[key].push(student)
     return acc
-  }, {} as Record<string, typeof filteredStudents>)
+  }, {} as Record<string, typeof students>)
 
   // Sort the groups by grade level order
   const gradeOrder = [
@@ -138,46 +204,128 @@ export default function StudentsArchivePage() {
         </p>
       </div>
 
-      {/* Year Selector */}
+      {/* Filters Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Select Academic Year</CardTitle>
+          <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="max-w-md">
-            <Label htmlFor="year">Academic Year</Label>
-            <Select value={selectedYearId} onValueChange={setSelectedYearId}>
-              <SelectTrigger id="year">
-                <SelectValue placeholder="Select an academic year" />
-              </SelectTrigger>
-              <SelectContent>
-                {pastYears.length === 0 ? (
-                  <SelectItem value="none" disabled>
-                    No past academic years available
-                  </SelectItem>
-                ) : (
-                  pastYears.map((year) => (
-                    <SelectItem key={year.id} value={year.id}>
-                      SY {year.name} {''}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Academic Year Selector */}
+            <div>
+              <Label htmlFor="year">Academic Year *</Label>
+              <Select value={selectedYearId} onValueChange={setSelectedYearId}>
+                <SelectTrigger id="year">
+                  <SelectValue placeholder="Select an academic year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pastYears.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No past academic years available
                     </SelectItem>
-                  ))
+                  ) : (
+                    pastYears.map((year) => (
+                      <SelectItem key={year.id} value={year.id}>
+                        SY {year.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Grade Level Filter */}
+            <div>
+              <Label htmlFor="grade">Grade Level</Label>
+              <Select
+                value={gradeLevelFilter}
+                onValueChange={setGradeLevelFilter}
+                disabled={!selectedYearId}
+              >
+                <SelectTrigger id="grade">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GRADE_LEVELS.map((grade) => (
+                    <SelectItem key={grade} value={grade}>
+                      {grade}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Search Input */}
+            <div>
+              <Label htmlFor="search">Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  id="search"
+                  placeholder="Name, LRN, City, Guardian..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  disabled={!selectedYearId}
+                  className="pl-10 pr-10"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 )}
-              </SelectContent>
-            </Select>
+              </div>
+            </div>
           </div>
+
+          {/* Active filters indicator */}
+          {selectedYearId && (debouncedSearch || gradeLevelFilter !== 'All Grades') && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+              <span className="font-medium">Active filters:</span>
+              {debouncedSearch && (
+                <Badge variant="secondary">Search: "{debouncedSearch}"</Badge>
+              )}
+              {gradeLevelFilter !== 'All Grades' && (
+                <Badge variant="secondary">Grade: {gradeLevelFilter}</Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('')
+                  setGradeLevelFilter('All Grades')
+                }}
+                className="h-6 px-2 text-xs"
+              >
+                Clear filters
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Results */}
       {selectedYearId ? (
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
+          {/* Background fetching indicator */}
+          {isFetching && !isLoading && (
+            <div className="absolute top-0 right-0 z-10">
+              <div className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md text-sm flex items-center gap-2 shadow-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Updating...
+              </div>
+            </div>
+          )}
+
           {isLoading ? (
             <Card>
               <CardContent className="py-8">
                 <p className="text-center">Loading...</p>
               </CardContent>
             </Card>
-          ) : filteredStudents.length === 0 ? (
+          ) : students.length === 0 ? (
             <Card>
               <CardContent className="py-8">
                 <p className="text-center text-gray-500">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { prepopulateAcademicYearData } from '@/lib/academic-year-helpers'
 
 const academicYearSchema = z.object({
   name: z.string().min(1, 'Academic year name is required'),
@@ -64,7 +65,17 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(academicYear, { status: 201 })
+    // Prepopulate data for the new academic year
+    const prepopulationSummary = await prepopulateAcademicYearData(academicYear.id)
+
+    return NextResponse.json(
+      {
+        academicYear,
+        prepopulation: prepopulationSummary,
+        message: 'Academic year created successfully with prepopulated data',
+      },
+      { status: 201 }
+    )
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

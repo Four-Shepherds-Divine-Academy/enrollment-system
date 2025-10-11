@@ -476,3 +476,238 @@ export function usePaymentHistory(filters: {
     refetchOnWindowFocus: true,
   })
 }
+
+// Optional Fees
+const OPTIONAL_FEES_QUERY_KEY = 'optional-fees'
+
+export function useOptionalFees(filters: {
+  academicYearId?: string
+  gradeLevel?: string
+  category?: string
+  isActive?: boolean
+  search?: string
+} = {}) {
+  return useQuery({
+    queryKey: [OPTIONAL_FEES_QUERY_KEY, filters],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (filters.academicYearId) params.append('academicYearId', filters.academicYearId)
+      if (filters.gradeLevel) params.append('gradeLevel', filters.gradeLevel)
+      if (filters.category) params.append('category', filters.category)
+      if (filters.isActive !== undefined) params.append('isActive', filters.isActive.toString())
+      if (filters.search) params.append('search', filters.search)
+
+      const response = await fetch(`/api/fees/optional?${params.toString()}`, {
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error('Failed to fetch optional fees')
+      return response.json()
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    placeholderData: (previousData) => previousData,
+  })
+}
+
+export function useStudentOptionalFees(studentId: string, academicYearId?: string) {
+  return useQuery({
+    queryKey: [OPTIONAL_FEES_QUERY_KEY, 'student', studentId, academicYearId],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (academicYearId) params.append('academicYearId', academicYearId)
+
+      const response = await fetch(`/api/students/${studentId}/optional-fees?${params.toString()}`)
+      if (!response.ok) throw new Error('Failed to fetch student optional fees')
+      return response.json()
+    },
+    enabled: !!studentId,
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useAssignOptionalFee() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      studentId,
+      data,
+    }: {
+      studentId: string
+      data: {
+        optionalFeeId: string
+        academicYearId: string
+        selectedVariationId?: string
+        amount: number
+      }
+    }) => {
+      const response = await fetch(`/api/students/${studentId}/optional-fees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to assign optional fee')
+      }
+
+      return response.json()
+    },
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: [OPTIONAL_FEES_QUERY_KEY, 'student', variables.studentId]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: [FEES_QUERY_KEY, 'status', variables.studentId],
+        }),
+      ])
+      await queryClient.refetchQueries({
+        queryKey: [OPTIONAL_FEES_QUERY_KEY, 'student', variables.studentId],
+      })
+      toast.success('Optional fee assigned successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message)
+    },
+  })
+}
+
+export function useRemoveOptionalFee() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      studentId,
+      optionalFeeId,
+      academicYearId,
+    }: {
+      studentId: string
+      optionalFeeId: string
+      academicYearId: string
+    }) => {
+      const params = new URLSearchParams()
+      params.append('optionalFeeId', optionalFeeId)
+      params.append('academicYearId', academicYearId)
+
+      const response = await fetch(`/api/students/${studentId}/optional-fees?${params.toString()}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to remove optional fee')
+      }
+
+      return response.json()
+    },
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: [OPTIONAL_FEES_QUERY_KEY, 'student', variables.studentId]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: [FEES_QUERY_KEY, 'status', variables.studentId],
+        }),
+      ])
+      await queryClient.refetchQueries({
+        queryKey: [OPTIONAL_FEES_QUERY_KEY, 'student', variables.studentId],
+      })
+      toast.success('Optional fee removed successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message)
+    },
+  })
+}
+
+// Admin-level Optional Fee Management
+export function useCreateOptionalFee() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch('/api/fees/optional', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create optional fee')
+      }
+
+      return response.json()
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [OPTIONAL_FEES_QUERY_KEY] })
+      await queryClient.refetchQueries({ queryKey: [OPTIONAL_FEES_QUERY_KEY] })
+      toast.success('Optional fee created successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message)
+    },
+  })
+}
+
+export function useUpdateOptionalFee() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await fetch(`/api/fees/optional/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update optional fee')
+      }
+
+      return response.json()
+    },
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [OPTIONAL_FEES_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [OPTIONAL_FEES_QUERY_KEY, variables.id] })
+      ])
+      await queryClient.refetchQueries({ queryKey: [OPTIONAL_FEES_QUERY_KEY] })
+      toast.success('Optional fee updated successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message)
+    },
+  })
+}
+
+export function useDeleteOptionalFee() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/fees/optional/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to delete optional fee')
+      }
+
+      return response.json()
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [OPTIONAL_FEES_QUERY_KEY] })
+      await queryClient.refetchQueries({ queryKey: [OPTIONAL_FEES_QUERY_KEY] })
+      toast.success('Optional fee deleted successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message)
+    },
+  })
+}

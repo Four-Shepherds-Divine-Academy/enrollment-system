@@ -38,12 +38,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Pencil, Trash2, Eye, ArrowRightLeft, Loader2, User, MapPin, Phone, GraduationCap, History, FileText, DollarSign } from 'lucide-react'
+import { Pencil, Trash2, Eye, ArrowRightLeft, Loader2, User, MapPin, Phone, GraduationCap, History, FileText, DollarSign, UserPlus, ChevronDown } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { useStudentsStore } from '@/store/students-store'
-import { useStudents, useDeleteStudent, useSwitchStudent } from '@/hooks/use-students'
+import { useStudents, useDeleteStudent, useSwitchStudent, useUpdateStudent } from '@/hooks/use-students'
 import { useActiveAcademicYear } from '@/hooks/use-academic-years'
 import { useSections } from '@/hooks/use-sections'
 import { parseRemarks } from '@/lib/utils/format-remarks'
@@ -137,6 +144,7 @@ export default function StudentsListPage() {
   // Track which student is being acted upon
   const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null)
   const [switchingStudentId, setSwitchingStudentId] = useState<string | null>(null)
+  const [updatingStatusStudentId, setUpdatingStatusStudentId] = useState<string | null>(null)
 
   // Zustand store - only for UI state
   const { filters, setSearchQuery, setGradeLevel, setStatus, setRemark, setPaymentStatus } = useStudentsStore()
@@ -175,6 +183,7 @@ export default function StudentsListPage() {
 
   const deleteMutation = useDeleteStudent()
   const switchMutation = useSwitchStudent()
+  const updateMutation = useUpdateStudent()
 
   // Fetch sections based on selected grade level
   const { data: sections = [], isLoading: loadingSections } = useSections({
@@ -273,10 +282,85 @@ export default function StudentsListPage() {
     }
   }
 
+  const handleStatusUpdate = async (studentId: string, newStatus: string) => {
+    try {
+      setUpdatingStatusStudentId(studentId)
+
+      // Fetch full student data first
+      const response = await fetch(`/api/students/${studentId}`)
+      if (!response.ok) throw new Error('Failed to fetch student data')
+
+      const fullStudentData = await response.json()
+
+      // Helper function to handle optional salary fields - return empty string if no value
+      const handleSalary = (value: any) => {
+        if (value === null || value === undefined || value === '') {
+          return ''
+        }
+        return value
+      }
+
+      // Only send fields that are part of the studentSchema
+      const updateData = {
+        lrn: fullStudentData.lrn || '',
+        firstName: fullStudentData.firstName,
+        middleName: fullStudentData.middleName || '',
+        lastName: fullStudentData.lastName,
+        gender: fullStudentData.gender,
+        contactNumber: fullStudentData.contactNumber,
+        dateOfBirth: new Date(fullStudentData.dateOfBirth).toISOString().split('T')[0],
+        houseNumber: fullStudentData.houseNumber || '',
+        street: fullStudentData.street || '',
+        subdivision: fullStudentData.subdivision || '',
+        barangay: fullStudentData.barangay,
+        city: fullStudentData.city,
+        province: fullStudentData.province,
+        zipCode: fullStudentData.zipCode || '',
+        parentGuardian: fullStudentData.parentGuardian,
+        fatherName: fullStudentData.fatherName || '',
+        fatherOccupation: fullStudentData.fatherOccupation || '',
+        fatherEmployer: fullStudentData.fatherEmployer || '',
+        fatherWorkContact: fullStudentData.fatherWorkContact || '',
+        fatherMonthlySalary: handleSalary(fullStudentData.fatherMonthlySalary),
+        motherName: fullStudentData.motherName || '',
+        motherOccupation: fullStudentData.motherOccupation || '',
+        motherEmployer: fullStudentData.motherEmployer || '',
+        motherWorkContact: fullStudentData.motherWorkContact || '',
+        motherMonthlySalary: handleSalary(fullStudentData.motherMonthlySalary),
+        guardianRelationship: fullStudentData.guardianRelationship || '',
+        emergencyContactName: fullStudentData.emergencyContactName || '',
+        emergencyContactNumber: fullStudentData.emergencyContactNumber || '',
+        emergencyContactRelationship: fullStudentData.emergencyContactRelationship || '',
+        gradeLevel: fullStudentData.gradeLevel,
+        section: fullStudentData.section?.id || fullStudentData.sectionId || '',
+        enrollmentStatus: newStatus,
+        isTransferee: fullStudentData.isTransferee,
+        previousSchool: fullStudentData.previousSchool || '',
+        remarks: fullStudentData.remarks || '',
+      }
+
+      updateMutation.mutate({
+        id: studentId,
+        data: updateData
+      }, {
+        onSuccess: () => {
+          setUpdatingStatusStudentId(null)
+        },
+        onError: () => {
+          setUpdatingStatusStudentId(null)
+        }
+      })
+    } catch (error) {
+      setUpdatingStatusStudentId(null)
+      toast.error('Failed to update student status')
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: any; className: string }> = {
       ENROLLED: { variant: 'default', className: 'bg-green-100 text-green-700 border-green-300' },
       PENDING: { variant: 'secondary', className: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+      TRANSFERRED: { variant: 'secondary', className: 'bg-blue-100 text-blue-700 border-blue-300' },
       DROPPED: { variant: 'destructive', className: 'bg-red-100 text-red-700 border-red-300' },
     }
     const config = variants[status] || variants.PENDING
@@ -284,6 +368,62 @@ export default function StudentsListPage() {
       <Badge variant={config.variant} className={config.className}>
         {status}
       </Badge>
+    )
+  }
+
+  const StatusBadgeDropdown = ({ student }: { student: Student }) => {
+    const currentStatus = student.currentYearEnrollmentStatus || student.enrollmentStatus
+    const isUpdating = updatingStatusStudentId === student.id
+    const variants: Record<string, { variant: any; className: string }> = {
+      ENROLLED: { variant: 'default', className: 'bg-green-100 text-green-700 border-green-300' },
+      PENDING: { variant: 'secondary', className: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+      TRANSFERRED: { variant: 'secondary', className: 'bg-blue-100 text-blue-700 border-blue-300' },
+      DROPPED: { variant: 'destructive', className: 'bg-red-100 text-red-700 border-red-300' },
+    }
+    const config = variants[currentStatus] || variants.PENDING
+
+    const statuses = [
+      { value: 'PENDING', label: 'Pending', className: 'text-yellow-700' },
+      { value: 'ENROLLED', label: 'Enrolled', className: 'text-green-700' },
+      { value: 'TRANSFERRED', label: 'Transferred', className: 'text-blue-700' },
+      { value: 'DROPPED', label: 'Dropped', className: 'text-red-700' },
+    ]
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild disabled={isUpdating}>
+          <button className="focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded" disabled={isUpdating}>
+            <Badge variant={config.variant} className={`${config.className} cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1 ${isUpdating ? 'opacity-60 cursor-not-allowed' : ''}`}>
+              {isUpdating ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  {currentStatus}
+                  <ChevronDown className="h-3 w-3" />
+                </>
+              )}
+            </Badge>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-40">
+          {statuses.map((status) => (
+            <DropdownMenuItem
+              key={status.value}
+              onClick={() => handleStatusUpdate(student.id, status.value)}
+              disabled={currentStatus === status.value || isUpdating}
+              className={`cursor-pointer ${status.className} ${currentStatus === status.value ? 'opacity-50' : ''}`}
+            >
+              <span className="font-medium">{status.label}</span>
+              {currentStatus === status.value && (
+                <span className="ml-auto text-xs">✓</span>
+              )}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     )
   }
 
@@ -319,11 +459,21 @@ export default function StudentsListPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Students</h2>
-        <p className="text-gray-600 mt-1">
-          Manage students for {activeYear.name}
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Students</h2>
+          <p className="text-gray-600 mt-1">
+            Manage students for {activeYear.name}
+          </p>
+        </div>
+        <Button
+          onClick={() => router.push('/admin/dashboard/enroll')}
+          size="default"
+          className="w-full sm:w-auto"
+        >
+          <UserPlus className="h-4 w-4 mr-2" />
+          Enroll Student
+        </Button>
       </div>
 
       {/* Filters */}
@@ -365,8 +515,9 @@ export default function StudentsListPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="All Status">All Status</SelectItem>
-                  <SelectItem value="ENROLLED">Enrolled</SelectItem>
                   <SelectItem value="PENDING">Pending</SelectItem>
+                  <SelectItem value="ENROLLED">Enrolled</SelectItem>
+                  <SelectItem value="TRANSFERRED">Transferred</SelectItem>
                   <SelectItem value="DROPPED">Dropped</SelectItem>
                 </SelectContent>
               </Select>
@@ -460,7 +611,7 @@ export default function StudentsListPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {getStatusBadge(student.currentYearEnrollmentStatus || student.enrollmentStatus)}
+                        <StatusBadgeDropdown student={student} />
                       </TableCell>
                       <TableCell>
                         <Button
@@ -559,21 +710,132 @@ export default function StudentsListPage() {
 
               <Separator />
 
-              {/* Contact Information */}
+              {/* Parent/Guardian Information */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                   <Phone className="h-4 w-4" />
-                  <span>Contact Information</span>
+                  <span>Parent/Guardian Information</span>
                 </div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3 pl-6">
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500">Contact Number</p>
-                    <p className="text-sm font-medium">{selectedStudent.contactNumber}</p>
+                <div className="pl-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500">Primary Contact Number</p>
+                      <p className="text-sm font-medium">{selectedStudent.contactNumber}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500">Primary Parent/Guardian</p>
+                      <p className="text-sm font-medium">{selectedStudent.parentGuardian}</p>
+                    </div>
+                    {(selectedStudent as any).guardianRelationship && (
+                      <div className="space-y-1">
+                        <p className="text-xs text-gray-500">Guardian Relationship</p>
+                        <p className="text-sm font-medium">{(selectedStudent as any).guardianRelationship}</p>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500">Parent/Guardian</p>
-                    <p className="text-sm font-medium">{selectedStudent.parentGuardian}</p>
-                  </div>
+
+                  {/* Father's Information */}
+                  {((selectedStudent as any).fatherName || (selectedStudent as any).fatherOccupation) && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Father's Information</p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                        {(selectedStudent as any).fatherName && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Name</p>
+                            <p className="text-sm font-medium">{(selectedStudent as any).fatherName}</p>
+                          </div>
+                        )}
+                        {(selectedStudent as any).fatherOccupation && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Occupation</p>
+                            <p className="text-sm font-medium">{(selectedStudent as any).fatherOccupation}</p>
+                          </div>
+                        )}
+                        {(selectedStudent as any).fatherEmployer && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Employer</p>
+                            <p className="text-sm font-medium">{(selectedStudent as any).fatherEmployer}</p>
+                          </div>
+                        )}
+                        {(selectedStudent as any).fatherWorkContact && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Work Contact</p>
+                            <p className="text-sm font-medium">{(selectedStudent as any).fatherWorkContact}</p>
+                          </div>
+                        )}
+                        {(selectedStudent as any).fatherMonthlySalary && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Monthly Salary</p>
+                            <p className="text-sm font-medium">₱{(selectedStudent as any).fatherMonthlySalary.toLocaleString()}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mother's Information */}
+                  {((selectedStudent as any).motherName || (selectedStudent as any).motherOccupation) && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Mother's Information</p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                        {(selectedStudent as any).motherName && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Name</p>
+                            <p className="text-sm font-medium">{(selectedStudent as any).motherName}</p>
+                          </div>
+                        )}
+                        {(selectedStudent as any).motherOccupation && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Occupation</p>
+                            <p className="text-sm font-medium">{(selectedStudent as any).motherOccupation}</p>
+                          </div>
+                        )}
+                        {(selectedStudent as any).motherEmployer && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Employer</p>
+                            <p className="text-sm font-medium">{(selectedStudent as any).motherEmployer}</p>
+                          </div>
+                        )}
+                        {(selectedStudent as any).motherWorkContact && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Work Contact</p>
+                            <p className="text-sm font-medium">{(selectedStudent as any).motherWorkContact}</p>
+                          </div>
+                        )}
+                        {(selectedStudent as any).motherMonthlySalary && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Monthly Salary</p>
+                            <p className="text-sm font-medium">₱{(selectedStudent as any).motherMonthlySalary.toLocaleString()}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Emergency Contact */}
+                  {(selectedStudent as any).emergencyContactName && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Guardian Contact Information</p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                        <div className="space-y-1">
+                          <p className="text-xs text-gray-500">Name</p>
+                          <p className="text-sm font-medium">{(selectedStudent as any).emergencyContactName}</p>
+                        </div>
+                        {(selectedStudent as any).emergencyContactNumber && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Contact Number</p>
+                            <p className="text-sm font-medium">{(selectedStudent as any).emergencyContactNumber}</p>
+                          </div>
+                        )}
+                        {(selectedStudent as any).emergencyContactRelationship && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">Relationship</p>
+                            <p className="text-sm font-medium">{(selectedStudent as any).emergencyContactRelationship}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

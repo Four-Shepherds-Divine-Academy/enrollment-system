@@ -28,7 +28,8 @@ import {
   DollarSign,
   Receipt,
   MessageSquare,
-  Trash2
+  Trash2,
+  Archive
 } from 'lucide-react'
 import { NotificationCenter } from '@/components/notification-center'
 import { ActiveYearBadge } from '@/components/active-year-badge'
@@ -112,13 +113,27 @@ export default async function AdminLayout({
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
 
-                  {/* Navigation Items */}
+                  {/* Dashboard Section */}
+                  <div className="px-2 py-1.5">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Overview
+                    </p>
+                  </div>
                   <DropdownMenuItem asChild>
                     <Link href="/admin/dashboard" className="flex items-center cursor-pointer">
                       <Home className="mr-2 h-4 w-4" />
                       <span>Dashboard</span>
                     </Link>
                   </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  {/* Academic Management Section */}
+                  <div className="px-2 py-1.5">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Academic Management
+                    </p>
+                  </div>
                   <DropdownMenuItem asChild>
                     <Link href="/admin/dashboard/academic-years" className="flex items-center cursor-pointer">
                       <Calendar className="mr-2 h-4 w-4" />
@@ -129,6 +144,12 @@ export default async function AdminLayout({
                     <Link href="/admin/dashboard/students" className="flex items-center cursor-pointer">
                       <Users className="mr-2 h-4 w-4" />
                       <span>Students</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/students/archive" className="flex items-center cursor-pointer">
+                      <Archive className="mr-2 h-4 w-4" />
+                      <span>Student Archive</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -149,22 +170,15 @@ export default async function AdminLayout({
                       <span>Manage Remarks</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin/dashboard/recycle-bin" className="flex items-center cursor-pointer">
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      <span>Recycle Bin</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin/dashboard/reports" className="flex items-center cursor-pointer">
-                      <FileText className="mr-2 h-4 w-4" />
-                      <span>Reports</span>
-                    </Link>
-                  </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
 
-                  {/* Fee Management */}
+                  {/* Financial Management Section */}
+                  <div className="px-2 py-1.5">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Financial Management
+                    </p>
+                  </div>
                   <DropdownMenuItem asChild>
                     <Link href="/admin/dashboard/fees" className="flex items-center cursor-pointer">
                       <Receipt className="mr-2 h-4 w-4" />
@@ -175,6 +189,36 @@ export default async function AdminLayout({
                     <Link href="/admin/dashboard/payment-history" className="flex items-center cursor-pointer">
                       <DollarSign className="mr-2 h-4 w-4" />
                       <span>Payment History</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  {/* Reports & Analytics Section */}
+                  <div className="px-2 py-1.5">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Reports & Analytics
+                    </p>
+                  </div>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/reports" className="flex items-center cursor-pointer">
+                      <FileText className="mr-2 h-4 w-4" />
+                      <span>Reports</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  {/* System Configuration Section */}
+                  <div className="px-2 py-1.5">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      System
+                    </p>
+                  </div>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard/recycle-bin" className="flex items-center cursor-pointer">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      <span>Recycle Bin</span>
                     </Link>
                   </DropdownMenuItem>
 

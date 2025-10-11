@@ -22,7 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, DollarSign, Eye, CheckCircle2, Clock, AlertCircle, Search, X } from 'lucide-react'
+import { Loader2, DollarSign, Eye, EyeOff, CheckCircle2, Clock, AlertCircle, Search, X } from 'lucide-react'
 import { useActiveAcademicYear } from '@/hooks/use-academic-years'
 import { usePaymentHistory } from '@/hooks/use-fees'
 import { format, differenceInDays } from 'date-fns'
@@ -50,6 +50,7 @@ export default function PaymentHistoryPage() {
   const [netPaymentFilter, setNetPaymentFilter] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [hideValues, setHideValues] = useState(true) // Hide values by default
 
   const { data: activeYear } = useActiveAcademicYear()
   const { data: paymentHistory = [], isLoading } = usePaymentHistory({
@@ -149,7 +150,8 @@ export default function PaymentHistoryPage() {
     )
   }
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, hide: boolean = false) => {
+    if (hide) return '₱ ••••••'
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
@@ -189,11 +191,31 @@ export default function PaymentHistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Payment History</h2>
-        <p className="text-gray-600 mt-1">
-          View all students' payment status for {activeYear.name}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Payment History</h2>
+          <p className="text-gray-600 mt-1">
+            View all students' payment status for {activeYear.name}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setHideValues(!hideValues)}
+          className="flex items-center gap-2"
+        >
+          {hideValues ? (
+            <>
+              <EyeOff className="h-4 w-4" />
+              Show Values
+            </>
+          ) : (
+            <>
+              <Eye className="h-4 w-4" />
+              Hide Values
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Statistics Cards */}
@@ -243,7 +265,7 @@ export default function PaymentHistoryPage() {
             <CardTitle className="text-sm text-muted-foreground">Total Collected</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-bold text-green-600">{formatCurrency(stats.totalCollected)}</p>
+            <p className="text-lg font-bold text-green-600">{formatCurrency(stats.totalCollected, hideValues)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -251,7 +273,7 @@ export default function PaymentHistoryPage() {
             <CardTitle className="text-sm text-muted-foreground">Total Due</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-bold">{formatCurrency(stats.totalDue)}</p>
+            <p className="text-lg font-bold">{formatCurrency(stats.totalDue, hideValues)}</p>
           </CardContent>
         </Card>
       </div>
@@ -403,15 +425,15 @@ export default function PaymentHistoryPage() {
                             {getEnrollmentStatusBadge(record.currentYearEnrollmentStatus)}
                           </TableCell>
                           <TableCell className="text-right font-medium">
-                            {isNotEnrolled ? '-' : formatCurrency(record.totalDue)}
+                            {isNotEnrolled ? '-' : formatCurrency(record.totalDue, hideValues)}
                           </TableCell>
                           <TableCell className="text-right text-green-600 font-medium">
-                            {isNotEnrolled ? '-' : formatCurrency(record.totalPaid)}
+                            {isNotEnrolled ? '-' : formatCurrency(record.totalPaid, hideValues)}
                           </TableCell>
                           <TableCell className={`text-right font-bold ${
                             isNotEnrolled ? '' : record.balance > 0 ? 'text-red-600' : 'text-green-600'
                           }`}>
-                            {isNotEnrolled ? '-' : formatCurrency(record.balance)}
+                            {isNotEnrolled ? '-' : formatCurrency(record.balance, hideValues)}
                           </TableCell>
                           <TableCell>
                             {isNotEnrolled ? '-' : getStatusBadge(record.paymentStatus)}

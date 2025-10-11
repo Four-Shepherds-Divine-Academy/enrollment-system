@@ -52,6 +52,13 @@ async function main(): Promise<void> {
     console.error('Error seeding 2025-2026:', error)
   }
 
+  console.log('\nSeeding 2025 fee templates...')
+  try {
+    execSync('tsx prisma/seed-fees-2025.ts', { stdio: 'inherit' })
+  } catch (error) {
+    console.error('Error seeding 2025 fees:', error)
+  }
+
   console.log('\n✅ All seeds completed successfully!')
 }
 

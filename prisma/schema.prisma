@@ -34,8 +34,30 @@ model Student {
   province         String           // Province
   zipCode          String?          // Postal/ZIP code
 
-  // Guardian Information
-  parentGuardian   String
+  // Parent/Guardian Information
+  parentGuardian   String           // Legacy field for backward compatibility
+
+  // Father's Information
+  fatherName       String?
+  fatherOccupation String?
+  fatherEmployer   String?
+  fatherWorkContact String?
+  fatherMonthlySalary Float?
+
+  // Mother's Information
+  motherName       String?
+  motherOccupation String?
+  motherEmployer   String?
+  motherWorkContact String?
+  motherMonthlySalary Float?
+
+  // Guardian Relationship (if not parent)
+  guardianRelationship String?
+
+  // Emergency Contact
+  emergencyContactName String?
+  emergencyContactNumber String?
+  emergencyContactRelationship String?
 
   // Academic Information
   gradeLevel       String
@@ -55,6 +77,7 @@ model Student {
   paymentAdjustments PaymentAdjustment[]
   feeStatus        StudentFeeStatus[]
   refunds          Refund[]
+  optionalFees     StudentOptionalFee[]
 
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -81,6 +104,8 @@ model AcademicYear {
   paymentAdjustments PaymentAdjustment[]
   studentFeeStatuses StudentFeeStatus[]
   refunds          Refund[]
+  optionalFees     OptionalFee[]
+  studentOptionalFees StudentOptionalFee[]
 
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -416,6 +441,94 @@ model CustomRemark {
 
   @@index([category])
   @@index([isActive])
+}
+
+// Optional Fees Model - For fees not included in base template
+model OptionalFee {
+  id               String           @id @default(cuid())
+  name             String           // e.g., "School ID", "PE Uniform"
+  description      String?          // Additional description
+  amount           Float?           // Fixed amount, null if variable (e.g., by gender)
+  category         OptionalFeeCategory @default(OTHER)
+
+  // For items with variations (e.g., uniforms by gender)
+  hasVariations    Boolean          @default(false)
+  variations       OptionalFeeVariation[]
+
+  // Availability settings
+  isActive         Boolean          @default(true)
+  applicableGradeLevels String[]    // Empty array means all grades, otherwise specific grades
+  academicYearId   String?
+  academicYear     AcademicYear?    @relation(fields: [academicYearId], references: [id])
+
+  // Student selections
+  studentOptionalFees StudentOptionalFee[]
+
+  sortOrder        Int              @default(0)
+  createdBy        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([isActive])
+  @@index([academicYearId])
+  @@index([category])
+}
+
+model OptionalFeeVariation {
+  id               String           @id @default(cuid())
+  optionalFeeId    String
+  optionalFee      OptionalFee      @relation(fields: [optionalFeeId], references: [id], onDelete: Cascade)
+
+  name             String           // e.g., "Girl - Short Sleeve", "Boy - Long Sleeve"
+  amount           Float
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([optionalFeeId])
+}
+
+// Junction table for students selecting optional fees
+model StudentOptionalFee {
+  id               String           @id @default(cuid())
+  studentId        String
+  student          Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  academicYearId   String
+  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id])
+
+  optionalFeeId    String
+  optionalFee      OptionalFee      @relation(fields: [optionalFeeId], references: [id])
+
+  // For fees with variations, store selected variation
+  selectedVariationId String?
+
+  // Actual amount at time of selection
+  amount           Float
+
+  // Payment tracking
+  isPaid           Boolean          @default(false)
+  paidAmount       Float            @default(0)
+
+  createdBy        String?          // Admin who added it
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([studentId, academicYearId, optionalFeeId])
+  @@index([studentId])
+  @@index([academicYearId])
+  @@index([optionalFeeId])
+  @@index([isPaid])
+}
+
+enum OptionalFeeCategory {
+  ID_CARD
+  UNIFORM
+  BOOKS
+  MISCELLANEOUS
+  GRADUATION
+  CERTIFICATION
+  OTHER
 }
 
 model RecycleBin {

@@ -16,11 +16,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       )
     }
 
-    // First, get all students who are not DROPPED
+    // First, get all students who have an enrollment in the current academic year
     const studentWhere: any = {
-      enrollmentStatus: {
-        not: 'DROPPED'
-      }
+      enrollments: {
+        some: {
+          academicYearId: academicYearId,
+        },
+      },
     }
 
     if (gradeLevel && gradeLevel !== 'All Grades') {

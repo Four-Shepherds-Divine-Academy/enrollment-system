@@ -47,18 +47,22 @@ import {
   Plus,
   Pencil,
   Trash2,
-  DollarSign,
   Loader2,
   X,
   AlertCircle,
   Search,
 } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useActiveAcademicYear } from '@/hooks/use-academic-years'
 import {
   useFeeTemplates,
   useCreateFeeTemplate,
   useUpdateFeeTemplate,
   useDeleteFeeTemplate,
+  useOptionalFees,
+  useCreateOptionalFee,
+  useUpdateOptionalFee,
+  useDeleteOptionalFee,
 } from '@/hooks/use-fees'
 
 const GRADE_LEVELS = [
@@ -88,6 +92,16 @@ const FEE_CATEGORIES = [
   { value: 'MISC', label: 'Miscellaneous' },
 ]
 
+const OPTIONAL_FEE_CATEGORIES = [
+  { value: 'ID_CARD', label: 'ID Card' },
+  { value: 'UNIFORM', label: 'Uniform' },
+  { value: 'BOOKS', label: 'Books' },
+  { value: 'MISCELLANEOUS', label: 'Miscellaneous' },
+  { value: 'GRADUATION', label: 'Graduation' },
+  { value: 'CERTIFICATION', label: 'Certification' },
+  { value: 'OTHER', label: 'Other' },
+]
+
 type Breakdown = {
   id?: string
   description: string
@@ -98,6 +112,7 @@ type Breakdown = {
 }
 
 export default function FeesManagementPage() {
+  const [activeTab, setActiveTab] = useState('templates')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<any>(null)
@@ -113,11 +128,33 @@ export default function FeesManagementPage() {
   const [gradeLevelFilter, setGradeLevelFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
 
+  // Optional fees search and filter states
+  const [optionalFeeSearchQuery, setOptionalFeeSearchQuery] = useState('')
+  const [debouncedOptionalFeeSearch, setDebouncedOptionalFeeSearch] = useState('')
+  const [optionalFeeCategoryFilter, setOptionalFeeCategoryFilter] = useState('all')
+
   // Form state
   const [name, setName] = useState('')
   const [gradeLevel, setGradeLevel] = useState('')
   const [description, setDescription] = useState('')
   const [breakdowns, setBreakdowns] = useState<Breakdown[]>([])
+
+  // Optional Fee states
+  const [optionalFeeDialogOpen, setOptionalFeeDialogOpen] = useState(false)
+  const [optionalFeeDeleteDialogOpen, setOptionalFeeDeleteDialogOpen] = useState(false)
+  const [editingOptionalFee, setEditingOptionalFee] = useState<any>(null)
+  const [optionalFeeToDelete, setOptionalFeeToDelete] = useState<any>(null)
+  const [deletingOptionalFeeId, setDeletingOptionalFeeId] = useState<string | null>(null)
+
+  // Optional Fee form state
+  const [optionalFeeName, setOptionalFeeName] = useState('')
+  const [optionalFeeDescription, setOptionalFeeDescription] = useState('')
+  const [optionalFeeAmount, setOptionalFeeAmount] = useState<number | null>(null)
+  const [optionalFeeCategory, setOptionalFeeCategory] = useState('OTHER')
+  const [hasVariations, setHasVariations] = useState(false)
+  const [variations, setVariations] = useState<Array<{ id?: string; name: string; amount: number }>>([])
+  const [applicableGradeLevels, setApplicableGradeLevels] = useState<string[]>([])
+  const [isActive, setIsActive] = useState(true)
 
   // Validation errors
   const [errors, setErrors] = useState<{
@@ -140,6 +177,15 @@ export default function FeesManagementPage() {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
+  // Debounce optional fee search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedOptionalFeeSearch(optionalFeeSearchQuery)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [optionalFeeSearchQuery])
+
   const { data: activeYear } = useActiveAcademicYear()
   const { data: templates = [], isLoading, isFetching } = useFeeTemplates({
     academicYearId: activeYear?.id,
@@ -148,9 +194,20 @@ export default function FeesManagementPage() {
     category: categoryFilter !== 'all' ? categoryFilter : undefined,
   })
 
+  const { data: optionalFees = [], isLoading: isLoadingOptionalFees } = useOptionalFees({
+    academicYearId: activeYear?.id,
+    search: debouncedOptionalFeeSearch || undefined,
+    category: optionalFeeCategoryFilter !== 'all' ? optionalFeeCategoryFilter : undefined,
+    isActive: undefined,
+  })
+
   const createMutation = useCreateFeeTemplate()
   const updateMutation = useUpdateFeeTemplate()
   const deleteMutation = useDeleteFeeTemplate()
+
+  const createOptionalFeeMutation = useCreateOptionalFee()
+  const updateOptionalFeeMutation = useUpdateOptionalFee()
+  const deleteOptionalFeeMutation = useDeleteOptionalFee()
 
   const addBreakdown = () => {
     setBreakdowns([
@@ -322,6 +379,133 @@ export default function FeesManagementPage() {
     }
   }
 
+  // Optional fee handlers
+  const handleOpenOptionalFeeDialog = (fee?: any) => {
+    if (fee) {
+      setEditingOptionalFee(fee)
+      setOptionalFeeName(fee.name)
+      setOptionalFeeDescription(fee.description || '')
+      setOptionalFeeAmount(fee.amount)
+      setOptionalFeeCategory(fee.category)
+      setHasVariations(fee.hasVariations)
+      setVariations(fee.variations || [])
+      setApplicableGradeLevels(fee.applicableGradeLevels || [])
+      setIsActive(fee.isActive)
+    } else {
+      setEditingOptionalFee(null)
+      setOptionalFeeName('')
+      setOptionalFeeDescription('')
+      setOptionalFeeAmount(null)
+      setOptionalFeeCategory('OTHER')
+      setHasVariations(false)
+      setVariations([])
+      setApplicableGradeLevels([])
+      setIsActive(true)
+    }
+    setOptionalFeeDialogOpen(true)
+  }
+
+  const handleCloseOptionalFeeDialog = () => {
+    setOptionalFeeDialogOpen(false)
+    setEditingOptionalFee(null)
+    setOptionalFeeName('')
+    setOptionalFeeDescription('')
+    setOptionalFeeAmount(null)
+    setOptionalFeeCategory('OTHER')
+    setHasVariations(false)
+    setVariations([])
+    setApplicableGradeLevels([])
+    setIsActive(true)
+  }
+
+  const handleSaveOptionalFee = async () => {
+    if (!activeYear) {
+      toast.error('No active academic year found')
+      return
+    }
+
+    if (!optionalFeeName.trim()) {
+      toast.error('Please enter a name for the optional fee')
+      return
+    }
+
+    if (!hasVariations && (optionalFeeAmount === null || optionalFeeAmount <= 0)) {
+      toast.error('Please enter a valid amount')
+      return
+    }
+
+    if (hasVariations && variations.length === 0) {
+      toast.error('Please add at least one variation')
+      return
+    }
+
+    const data = {
+      name: optionalFeeName,
+      description: optionalFeeDescription,
+      amount: hasVariations ? null : optionalFeeAmount,
+      category: optionalFeeCategory,
+      hasVariations,
+      variations: hasVariations ? variations : [],
+      applicableGradeLevels,
+      academicYearId: activeYear.id,
+      isActive,
+    }
+
+    try {
+      if (editingOptionalFee) {
+        await updateOptionalFeeMutation.mutateAsync({
+          id: editingOptionalFee.id,
+          data,
+        })
+      } else {
+        await createOptionalFeeMutation.mutateAsync(data)
+      }
+      handleCloseOptionalFeeDialog()
+    } catch (error) {
+      // Error handled by mutation
+    }
+  }
+
+  const handleDeleteOptionalFee = async () => {
+    if (optionalFeeToDelete) {
+      setDeletingOptionalFeeId(optionalFeeToDelete.id)
+      try {
+        await deleteOptionalFeeMutation.mutateAsync(optionalFeeToDelete.id)
+        setOptionalFeeDeleteDialogOpen(false)
+        setOptionalFeeToDelete(null)
+      } catch (error: any) {
+        // Show specific error message if available
+        if (error?.message) {
+          toast.error(error.message)
+        }
+      } finally {
+        setDeletingOptionalFeeId(null)
+      }
+    }
+  }
+
+  const addVariation = () => {
+    setVariations([...variations, { name: '', amount: 0 }])
+  }
+
+  const removeVariation = (index: number) => {
+    setVariations(variations.filter((_, i) => i !== index))
+  }
+
+  const updateVariation = (index: number, field: 'name' | 'amount', value: any) => {
+    const updated = [...variations]
+    updated[index] = { ...updated[index], [field]: value }
+    setVariations(updated)
+  }
+
+  const toggleGradeLevel = (gradeLevel: string) => {
+    if (applicableGradeLevels.includes(gradeLevel)) {
+      setApplicableGradeLevels(applicableGradeLevels.filter((g) => g !== gradeLevel))
+    } else {
+      setApplicableGradeLevels([...applicableGradeLevels, gradeLevel])
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
@@ -351,14 +535,24 @@ export default function FeesManagementPage() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Fee Management</h2>
           <p className="text-gray-600 mt-1">
-            Manage fee templates for {activeYear.name}
+            Manage fees for {activeYear.name}
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Fee Template
-        </Button>
       </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="templates">Fee Templates</TabsTrigger>
+          <TabsTrigger value="optional">Optional Fees</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="templates" className="space-y-6">
+          <div className="flex justify-end">
+            <Button onClick={() => handleOpenDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Fee Template
+            </Button>
+          </div>
 
       {/* Search and Filters */}
       <Card>
@@ -572,6 +766,290 @@ export default function FeesManagementPage() {
           })}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="optional" className="space-y-6">
+          <div className="flex justify-end">
+            <Button onClick={() => handleOpenOptionalFeeDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Optional Fee
+            </Button>
+          </div>
+
+          {/* Search and Filters for Optional Fees */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Search & Filters</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Search */}
+                <div>
+                  <Label htmlFor="optional-fee-search">Search</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="optional-fee-search"
+                      placeholder="Search by name or description..."
+                      value={optionalFeeSearchQuery}
+                      onChange={(e) => setOptionalFeeSearchQuery(e.target.value)}
+                      className="pl-10 pr-10"
+                    />
+                    {optionalFeeSearchQuery && (
+                      <button
+                        onClick={() => setOptionalFeeSearchQuery('')}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Category Filter */}
+                <div>
+                  <Label htmlFor="optional-fee-category-filter">Category</Label>
+                  <Select
+                    value={optionalFeeCategoryFilter}
+                    onValueChange={setOptionalFeeCategoryFilter}
+                  >
+                    <SelectTrigger id="optional-fee-category-filter">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {OPTIONAL_FEE_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Active filters indicator */}
+              {(debouncedOptionalFeeSearch || optionalFeeCategoryFilter !== 'all') && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+                  <span className="font-medium">Active filters:</span>
+                  {debouncedOptionalFeeSearch && (
+                    <Badge variant="secondary">
+                      Search: "{debouncedOptionalFeeSearch}"
+                    </Badge>
+                  )}
+                  {optionalFeeCategoryFilter !== 'all' && (
+                    <Badge variant="secondary">
+                      Category:{' '}
+                      {OPTIONAL_FEE_CATEGORIES.find(
+                        (c) => c.value === optionalFeeCategoryFilter
+                      )?.label}
+                    </Badge>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setOptionalFeeSearchQuery('')
+                      setOptionalFeeCategoryFilter('all')
+                    }}
+                    className="h-6 px-2 text-xs"
+                  >
+                    Clear all
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {isLoadingOptionalFees ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : optionalFees.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-gray-500">
+                {debouncedOptionalFeeSearch || optionalFeeCategoryFilter !== 'all' ? (
+                  <div className="space-y-2">
+                    <p className="font-medium">No results matching filters</p>
+                    <p className="text-sm">Try adjusting your search or filters</p>
+                  </div>
+                ) : (
+                  'No optional fees created yet. Click "Create Optional Fee" to get started.'
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="border-b bg-muted/20">
+                <CardTitle className="text-lg">Optional Fees</CardTitle>
+                <CardDescription>
+                  Optional fees that can be assigned to students
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableHead className="font-semibold w-[280px]">Name</TableHead>
+                        <TableHead className="font-semibold w-[140px]">Category</TableHead>
+                        <TableHead className="font-semibold w-[240px]">Amount / Variations</TableHead>
+                        <TableHead className="font-semibold w-[200px]">Grade Levels</TableHead>
+                        <TableHead className="font-semibold w-[100px]">Status</TableHead>
+                        <TableHead className="font-semibold text-right w-[180px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {optionalFees.map((fee: any) => (
+                        <TableRow
+                          key={fee.id}
+                          className="hover:bg-muted/40 transition-colors border-b"
+                        >
+                          <TableCell className="py-4">
+                            <div className="space-y-1">
+                              <div className="font-semibold text-base text-gray-900">
+                                {fee.name}
+                              </div>
+                              {fee.description && (
+                                <div className="text-sm text-muted-foreground line-clamp-2">
+                                  {fee.description}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <Badge
+                              variant="outline"
+                              className="font-medium text-xs px-2.5 py-1"
+                            >
+                              {OPTIONAL_FEE_CATEGORIES.find((c) => c.value === fee.category)
+                                ?.label || fee.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            {fee.hasVariations ? (
+                              <div className="space-y-1.5">
+                                {fee.variations.map((variation: any) => (
+                                  <div
+                                    key={variation.id}
+                                    className="flex items-center gap-2 text-sm bg-slate-50 rounded px-2 py-1 border border-slate-200"
+                                  >
+                                    <span className="font-medium text-gray-700 min-w-[100px]">
+                                      {variation.name}:
+                                    </span>
+                                    <span className="font-semibold text-primary">
+                                      {formatCurrency(variation.amount)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-base font-bold text-primary">
+                                {formatCurrency(fee.amount)}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-4">
+                            {fee.applicableGradeLevels.length === 0 ? (
+                              <Badge
+                                variant="secondary"
+                                className="bg-blue-100 text-blue-800 border-blue-200 font-medium"
+                              >
+                                All grades
+                              </Badge>
+                            ) : fee.applicableGradeLevels.length <= 3 ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {fee.applicableGradeLevels.map((grade: string) => (
+                                  <Badge
+                                    key={grade}
+                                    variant="secondary"
+                                    className="text-xs font-medium px-2 py-0.5"
+                                  >
+                                    {grade}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <Badge
+                                variant="secondary"
+                                className="text-xs font-medium"
+                                title={fee.applicableGradeLevels.join(', ')}
+                              >
+                                {fee.applicableGradeLevels.length} grades
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-4">
+                            {fee.isActive ? (
+                              <Badge
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700 font-medium"
+                              >
+                                Active
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="secondary"
+                                className="bg-gray-200 text-gray-700 font-medium"
+                              >
+                                Inactive
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right py-4">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenOptionalFeeDialog(fee)}
+                                disabled={
+                                  deletingOptionalFeeId !== null ||
+                                  createOptionalFeeMutation.isPending ||
+                                  updateOptionalFeeMutation.isPending
+                                }
+                                className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                              >
+                                <Pencil className="h-4 w-4 mr-1.5" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setOptionalFeeToDelete(fee)
+                                  setOptionalFeeDeleteDialogOpen(true)
+                                }}
+                                disabled={
+                                  deletingOptionalFeeId === fee.id ||
+                                  createOptionalFeeMutation.isPending ||
+                                  updateOptionalFeeMutation.isPending
+                                }
+                                className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+                              >
+                                {deletingOptionalFeeId === fee.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="h-4 w-4 mr-1.5" />
+                                    Delete
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -865,6 +1343,302 @@ export default function FeesManagementPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Optional Fee Create/Edit Dialog */}
+      <Dialog open={optionalFeeDialogOpen} onOpenChange={setOptionalFeeDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingOptionalFee ? 'Edit Optional Fee' : 'Create Optional Fee'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingOptionalFee
+                ? 'Update the details of this optional fee'
+                : 'Create a new optional fee that can be assigned to students'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Basic Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="optionalFeeName">Name *</Label>
+                <Input
+                  id="optionalFeeName"
+                  value={optionalFeeName}
+                  onChange={(e) => setOptionalFeeName(e.target.value)}
+                  placeholder="e.g., School Uniform"
+                />
+              </div>
+
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="optionalFeeDescription">Description</Label>
+                <Textarea
+                  id="optionalFeeDescription"
+                  value={optionalFeeDescription}
+                  onChange={(e) => setOptionalFeeDescription(e.target.value)}
+                  placeholder="Optional description"
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="optionalFeeCategory">Category *</Label>
+                <Select value={optionalFeeCategory} onValueChange={setOptionalFeeCategory}>
+                  <SelectTrigger id="optionalFeeCategory">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OPTIONAL_FEE_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2 flex items-end">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isActive"
+                    checked={isActive}
+                    onCheckedChange={(checked) => setIsActive(checked as boolean)}
+                  />
+                  <Label htmlFor="isActive" className="font-normal cursor-pointer">
+                    Active (available for assignment)
+                  </Label>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Variations Toggle */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="hasVariations"
+                  checked={hasVariations}
+                  onCheckedChange={(checked) => {
+                    setHasVariations(checked as boolean)
+                    if (checked && variations.length === 0) {
+                      setVariations([{ name: '', amount: 0 }])
+                    }
+                  }}
+                />
+                <Label htmlFor="hasVariations" className="font-normal cursor-pointer">
+                  This fee has variations (e.g., different sizes or types)
+                </Label>
+              </div>
+
+              {hasVariations ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Variations *</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addVariation}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Variation
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {variations.map((variation, index) => (
+                      <div key={index} className="flex gap-2 items-start">
+                        <div className="flex-1">
+                          <Input
+                            value={variation.name}
+                            onChange={(e) =>
+                              updateVariation(index, 'name', e.target.value)
+                            }
+                            placeholder="e.g., Small, Medium, Large"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={variation.amount}
+                            onChange={(e) =>
+                              updateVariation(
+                                index,
+                                'amount',
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            placeholder="Amount"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeVariation(index)}
+                          disabled={variations.length === 1}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="optionalFeeAmount">Amount *</Label>
+                  <Input
+                    id="optionalFeeAmount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={optionalFeeAmount || ''}
+                    onChange={(e) =>
+                      setOptionalFeeAmount(
+                        e.target.value ? parseFloat(e.target.value) : null
+                      )
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Grade Levels */}
+            <div className="space-y-3">
+              <Label>Applicable Grade Levels (leave empty for all grades)</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {GRADE_LEVELS.map((grade) => (
+                  <div key={grade} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`grade-${grade}`}
+                      checked={applicableGradeLevels.includes(grade)}
+                      onCheckedChange={() => toggleGradeLevel(grade)}
+                    />
+                    <Label
+                      htmlFor={`grade-${grade}`}
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      {grade}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCloseOptionalFeeDialog}
+              disabled={
+                createOptionalFeeMutation.isPending ||
+                updateOptionalFeeMutation.isPending
+              }
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveOptionalFee}
+              disabled={
+                !optionalFeeName.trim() ||
+                (!hasVariations && (optionalFeeAmount === null || optionalFeeAmount <= 0)) ||
+                (hasVariations && variations.length === 0) ||
+                createOptionalFeeMutation.isPending ||
+                updateOptionalFeeMutation.isPending
+              }
+            >
+              {(createOptionalFeeMutation.isPending ||
+                updateOptionalFeeMutation.isPending) && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              {editingOptionalFee ? 'Update Optional Fee' : 'Create Optional Fee'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Optional Fee Delete Confirmation */}
+      <AlertDialog
+        open={optionalFeeDeleteDialogOpen}
+        onOpenChange={setOptionalFeeDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Optional Fee?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Are you sure you want to delete the optional fee "
+                  {optionalFeeToDelete?.name}"?
+                </p>
+
+                {optionalFeeToDelete && (
+                  <div className="rounded-lg bg-muted p-3 space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium">Category:</span>{' '}
+                      {OPTIONAL_FEE_CATEGORIES.find(
+                        (c) => c.value === optionalFeeToDelete.category
+                      )?.label || optionalFeeToDelete.category}
+                    </div>
+                    {optionalFeeToDelete.hasVariations ? (
+                      <div>
+                        <span className="font-medium">Variations:</span>
+                        <ul className="list-disc list-inside ml-2 mt-1">
+                          {optionalFeeToDelete.variations?.map((v: any) => (
+                            <li key={v.id}>
+                              {v.name}: {formatCurrency(v.amount)}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div>
+                        <span className="font-medium">Amount:</span>{' '}
+                        {formatCurrency(optionalFeeToDelete.amount)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-start gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium">Warning</p>
+                    <p>
+                      This action cannot be undone if the fee is currently assigned to
+                      students. The delete will fail if there are active assignments.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteOptionalFeeMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteOptionalFee}
+              disabled={deleteOptionalFeeMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteOptionalFeeMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

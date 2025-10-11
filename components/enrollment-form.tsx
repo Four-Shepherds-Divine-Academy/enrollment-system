@@ -90,6 +90,8 @@ export function EnrollmentForm() {
 
   const form = useForm<StudentFormData>({
     resolver: zodResolver(studentSchema),
+    mode: 'onBlur', // Validate on blur
+    reValidateMode: 'onChange', // Re-validate on change after first validation
     defaultValues: {
       lrn: '',
       firstName: '',
@@ -105,6 +107,20 @@ export function EnrollmentForm() {
       province: '',
       zipCode: '',
       parentGuardian: '',
+      fatherName: '',
+      fatherOccupation: '',
+      fatherEmployer: '',
+      fatherWorkContact: '',
+      fatherMonthlySalary: undefined,
+      motherName: '',
+      motherOccupation: '',
+      motherEmployer: '',
+      motherWorkContact: '',
+      motherMonthlySalary: undefined,
+      guardianRelationship: '',
+      emergencyContactName: '',
+      emergencyContactNumber: '',
+      emergencyContactRelationship: '',
       gradeLevel: '',
       section: '',
       isTransferee: false,
@@ -741,9 +757,9 @@ export function EnrollmentForm() {
               </div>
             </div>
 
-            {/* Guardian Information */}
+            {/* Parent/Guardian Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Guardian Information</h3>
+              <h3 className="text-lg font-semibold">Parent/Guardian Information</h3>
 
               <FormField
                 control={form.control}
@@ -754,10 +770,278 @@ export function EnrollmentForm() {
                     <FormControl>
                       <Input placeholder="Maria Dela Cruz" {...field} />
                     </FormControl>
+                    <FormDescription>
+                      Primary contact person for this student
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {/* Father's Information */}
+              <div className="pt-4 border-t">
+                <h4 className="text-md font-semibold mb-3 text-gray-700">Father's Information</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="fatherName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Juan Dela Cruz" maxLength={100} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="fatherOccupation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Occupation</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Engineer" maxLength={100} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <FormField
+                    control={form.control}
+                    name="fatherEmployer"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Employer/Company Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="ABC Corporation" maxLength={150} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="fatherWorkContact"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Work Contact Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="09123456789" maxLength={13} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="mt-4">
+                  <FormField
+                    control={form.control}
+                    name="fatherMonthlySalary"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Monthly Income/Salary (₱)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="15000"
+                            min="1"
+                            max="10000000"
+                            step="0.01"
+                            {...field}
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Mother's Information */}
+              <div className="pt-4 border-t">
+                <h4 className="text-md font-semibold mb-3 text-gray-700">Mother's Information</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="motherName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Maria Santos" maxLength={100} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="motherOccupation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Occupation</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Teacher" maxLength={100} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <FormField
+                    control={form.control}
+                    name="motherEmployer"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Employer/Company Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="XYZ School" maxLength={150} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="motherWorkContact"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Work Contact Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="09123456789" maxLength={13} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="mt-4">
+                  <FormField
+                    control={form.control}
+                    name="motherMonthlySalary"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Monthly Income/Salary (₱)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="15000"
+                            min="1"
+                            max="10000000"
+                            step="0.01"
+                            {...field}
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Guardian Relationship */}
+              <div className="pt-4 border-t">
+                <FormField
+                  control={form.control}
+                  name="guardianRelationship"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Guardian Relationship to Student</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select relationship" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Father">Father</SelectItem>
+                          <SelectItem value="Mother">Mother</SelectItem>
+                          <SelectItem value="Grandfather">Grandfather</SelectItem>
+                          <SelectItem value="Grandmother">Grandmother</SelectItem>
+                          <SelectItem value="Uncle">Uncle</SelectItem>
+                          <SelectItem value="Aunt">Aunt</SelectItem>
+                          <SelectItem value="Sibling">Sibling</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Who is the primary guardian of this student?
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Emergency Contact */}
+              <div className="pt-4 border-t">
+                <h4 className="text-md font-semibold mb-3 text-gray-700">Guardian Contact Information</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="emergencyContactName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Pedro Santos" maxLength={100} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="emergencyContactNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="09123456789" maxLength={13} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="mt-4">
+                  <FormField
+                    control={form.control}
+                    name="emergencyContactRelationship"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Relationship to Student</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Uncle, Aunt, Neighbor, etc." maxLength={50} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Academic Information */}

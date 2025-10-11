@@ -30,7 +30,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Pencil, Upload, Loader2 } from 'lucide-react'
+import { Pencil, Upload, Loader2, CheckCircle2, Circle } from 'lucide-react'
 import { BulkImportStudentsDialog } from '@/components/bulk-import-students-dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
@@ -85,10 +85,34 @@ export default function AcademicYearsPage() {
   const [deletingYearId, setDeletingYearId] = useState<string | null>(null)
   const [updatingYearId, setUpdatingYearId] = useState<string | null>(null)
 
+  // Loading dialog state for creation
+  const [showCreatingDialog, setShowCreatingDialog] = useState(false)
+  const [creationProgress, setCreationProgress] = useState<{
+    step: string
+    details?: string
+  } | null>(null)
+
   // Set page title
   useEffect(() => {
     document.title = '4SDA - Academic Years'
   }, [])
+
+  // Prevent page reload/navigation when creating academic year
+  useEffect(() => {
+    if (showCreatingDialog) {
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        e.preventDefault()
+        e.returnValue = ''
+        return ''
+      }
+
+      window.addEventListener('beforeunload', handleBeforeUnload)
+
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload)
+      }
+    }
+  }, [showCreatingDialog])
 
   // Zustand store
   const { filters } = useAcademicYearsStore()
@@ -124,20 +148,44 @@ export default function AcademicYearsPage() {
       setPendingCreateData(data)
       setShowCreateConfirm(true)
     } else {
-      createMutation.mutate(data, {
-        onSuccess: (newYear) => {
-          setName('')
-          setStartDate('')
-          setEndDate('')
-          setShowForm(false)
-          setPendingCreateData(null)
+      // Show loading dialog
+      setShowCreatingDialog(true)
+      setCreationProgress({ step: 'Creating academic year...', details: 'Setting up the new academic year' })
 
-          // If import checkbox was checked, open import dialog
-          if (importPreviousStudents) {
-            setImportTargetYear(newYear)
-            setShowImportDialog(true)
-            setImportPreviousStudents(false)
+      createMutation.mutate(data, {
+        onSuccess: (response: any) => {
+          const newYear = response.academicYear || response
+          const prepopulation = response.prepopulation
+
+          // Update progress based on prepopulation results
+          if (prepopulation) {
+            setCreationProgress({
+              step: 'Prepopulation completed!',
+              details: `${prepopulation.feeTemplatesCopied} fee templates, ${prepopulation.optionalFeesCopied} optional fees, ${prepopulation.sectionsCreated} sections, ${prepopulation.remarksCreated} remarks`,
+            })
           }
+
+          // Close dialog after a short delay
+          setTimeout(() => {
+            setShowCreatingDialog(false)
+            setCreationProgress(null)
+            setName('')
+            setStartDate('')
+            setEndDate('')
+            setShowForm(false)
+            setPendingCreateData(null)
+
+            // If import checkbox was checked, open import dialog
+            if (importPreviousStudents) {
+              setImportTargetYear(newYear)
+              setShowImportDialog(true)
+              setImportPreviousStudents(false)
+            }
+          }, 2000)
+        },
+        onError: () => {
+          setShowCreatingDialog(false)
+          setCreationProgress(null)
         },
       })
     }
@@ -145,21 +193,45 @@ export default function AcademicYearsPage() {
 
   const handleConfirmCreate = () => {
     if (pendingCreateData) {
-      createMutation.mutate(pendingCreateData, {
-        onSuccess: (newYear) => {
-          setName('')
-          setStartDate('')
-          setEndDate('')
-          setShowForm(false)
-          setShowCreateConfirm(false)
-          setPendingCreateData(null)
+      // Show loading dialog and close confirm dialog
+      setShowCreateConfirm(false)
+      setShowCreatingDialog(true)
+      setCreationProgress({ step: 'Creating academic year...', details: 'Setting up the new academic year' })
 
-          // If import checkbox was checked, open import dialog
-          if (importPreviousStudents) {
-            setImportTargetYear(newYear)
-            setShowImportDialog(true)
-            setImportPreviousStudents(false)
+      createMutation.mutate(pendingCreateData, {
+        onSuccess: (response: any) => {
+          const newYear = response.academicYear || response
+          const prepopulation = response.prepopulation
+
+          // Update progress based on prepopulation results
+          if (prepopulation) {
+            setCreationProgress({
+              step: 'Prepopulation completed!',
+              details: `${prepopulation.feeTemplatesCopied} fee templates, ${prepopulation.optionalFeesCopied} optional fees, ${prepopulation.sectionsCreated} sections, ${prepopulation.remarksCreated} remarks`,
+            })
           }
+
+          // Close dialog after a short delay
+          setTimeout(() => {
+            setShowCreatingDialog(false)
+            setCreationProgress(null)
+            setName('')
+            setStartDate('')
+            setEndDate('')
+            setShowForm(false)
+            setPendingCreateData(null)
+
+            // If import checkbox was checked, open import dialog
+            if (importPreviousStudents) {
+              setImportTargetYear(newYear)
+              setShowImportDialog(true)
+              setImportPreviousStudents(false)
+            }
+          }, 2000)
+        },
+        onError: () => {
+          setShowCreatingDialog(false)
+          setCreationProgress(null)
         },
       })
     }
@@ -654,6 +726,89 @@ export default function AcademicYearsPage() {
           onSuccess={() => {}}
         />
       )}
+
+      {/* Creating Academic Year Loading Dialog */}
+      <Dialog open={showCreatingDialog} onOpenChange={() => {}}>
+        <DialogContent
+          className="sm:max-w-[500px]"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Creating Academic Year</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-6">
+            <div className="flex items-center justify-center">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+
+            {creationProgress && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <p className="text-lg font-semibold">{creationProgress.step}</p>
+                  {creationProgress.details && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {creationProgress.details}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-3 mt-6 bg-slate-50 p-4 rounded-lg">
+                  <p className="text-sm font-medium text-slate-700 mb-3">Prepopulating data:</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      {creationProgress.step.includes('completed') ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-slate-400" />
+                      )}
+                      <span className={creationProgress.step.includes('completed') ? 'text-green-700' : ''}>
+                        Fee templates from previous year
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {creationProgress.step.includes('completed') ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-slate-400" />
+                      )}
+                      <span className={creationProgress.step.includes('completed') ? 'text-green-700' : ''}>
+                        Optional fees and variations
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {creationProgress.step.includes('completed') ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-slate-400" />
+                      )}
+                      <span className={creationProgress.step.includes('completed') ? 'text-green-700' : ''}>
+                        Sections for all grade levels
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {creationProgress.step.includes('completed') ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-slate-400" />
+                      )}
+                      <span className={creationProgress.step.includes('completed') ? 'text-green-700' : ''}>
+                        Custom remarks and categories
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm text-yellow-800">
+                <strong>Please wait...</strong> Do not close this window or navigate away while the academic year is being created and data is being prepopulated.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
