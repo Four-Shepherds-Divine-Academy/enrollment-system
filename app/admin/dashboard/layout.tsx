@@ -59,7 +59,7 @@ export default async function AdminLayout({
       <Toaster position="top-right" />
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16">
           <div className="flex justify-between items-center h-16">
             {/* Logo and Brand */}
             <div className="flex items-center space-x-8">
@@ -247,7 +247,7 @@ export default async function AdminLayout({
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-8">
         {/* Global Alert for Missing Fee Templates */}
         <div className="mb-6">
           <MissingFeeTemplatesAlert />

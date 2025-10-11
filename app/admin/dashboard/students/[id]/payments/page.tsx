@@ -257,6 +257,18 @@ export default function StudentPaymentsPage() {
 
   const updateLineItemAmount = (feeBreakdownId: string, amount: number, isOptional: boolean = false) => {
     const key = isOptional ? `optional-${feeBreakdownId}` : feeBreakdownId
+
+    // For base fee breakdowns, validate against remaining balance
+    if (!isOptional) {
+      const breakdown = feeStatus?.feeTemplate?.breakdowns?.find((b: any) => b.id === feeBreakdownId)
+      if (breakdown) {
+        const paidAmount = paidByBreakdown[feeBreakdownId] || 0
+        const remainingBalance = breakdown.amount - paidAmount
+        // Cap the amount at remaining balance
+        amount = Math.min(amount, remainingBalance)
+      }
+    }
+
     setSelectedLineItems(prev => ({
       ...prev,
       [key]: amount
@@ -266,6 +278,52 @@ export default function StudentPaymentsPage() {
   const calculateSelectedTotal = () => {
     return Object.values(selectedLineItems).reduce((sum, amount) => sum + amount, 0)
   }
+
+  // Calculate how much has been paid for each fee breakdown
+  const calculatePaidAmountByBreakdown = () => {
+    const paidAmounts: Record<string, number> = {}
+
+    if (!feeStatus?.payments) return paidAmounts
+
+    // Iterate through all payments
+    feeStatus.payments.forEach((payment: any) => {
+      if (payment.lineItems && payment.lineItems.length > 0) {
+        // Payment has line items - track exact amounts paid per breakdown
+        payment.lineItems.forEach((lineItem: any) => {
+          const breakdownId = lineItem.feeBreakdownId
+          if (!paidAmounts[breakdownId]) {
+            paidAmounts[breakdownId] = 0
+          }
+          paidAmounts[breakdownId] += lineItem.amount
+        })
+      }
+    })
+
+    // Subtract refunds
+    feeStatus.payments.forEach((payment: any) => {
+      if (payment.refunds && payment.refunds.length > 0) {
+        payment.refunds.forEach((refund: any) => {
+          // For refunds, we need to proportionally reduce paid amounts
+          // This is a simplified approach - deduct refund from paid items proportionally
+          if (payment.lineItems && payment.lineItems.length > 0) {
+            const totalPaid = payment.lineItems.reduce((sum: number, item: any) => sum + item.amount, 0)
+            payment.lineItems.forEach((lineItem: any) => {
+              const breakdownId = lineItem.feeBreakdownId
+              const proportion = lineItem.amount / totalPaid
+              const refundAmount = refund.amount * proportion
+              if (paidAmounts[breakdownId]) {
+                paidAmounts[breakdownId] -= refundAmount
+              }
+            })
+          }
+        })
+      }
+    })
+
+    return paidAmounts
+  }
+
+  const paidByBreakdown = useMemo(() => calculatePaidAmountByBreakdown(), [feeStatus?.payments])
 
   const generateReferenceNumber = () => {
     const timestamp = Date.now().toString(36).toUpperCase()
@@ -477,12 +535,12 @@ export default function StudentPaymentsPage() {
       return
     }
 
-    const netPayment = selectedPayment.amountPaid - selectedPayment.refundAmount
+    const maxRefundable = getMaxRefundableAmount(selectedPayment)
 
-    if (amount > netPayment) {
-      setRefundError(`Refund amount cannot exceed the net payment of ${formatCurrency(netPayment)}`)
-      toast.error("Amount Exceeds Payment", {
-        description: `Refund amount cannot exceed the net payment of ${formatCurrency(netPayment)}.`,
+    if (amount > maxRefundable) {
+      setRefundError(`Refund amount cannot exceed the refundable portion of ${formatCurrency(maxRefundable)}`)
+      toast.error("Amount Exceeds Refundable Limit", {
+        description: `Refund amount cannot exceed the refundable portion of ${formatCurrency(maxRefundable)}.`,
       })
       return
     }
@@ -520,6 +578,60 @@ export default function StudentPaymentsPage() {
     setRefundReason('')
     setRefundError('')
     setRefundDialogOpen(true)
+  }
+
+  // Calculate maximum refundable amount for a payment based on its line items
+  const getMaxRefundableAmount = (payment: any) => {
+    if (!payment) return 0
+
+    // Calculate refundable amount from line items
+    let refundableAmount = payment.amountPaid
+
+    if (payment.lineItems && payment.lineItems.length > 0) {
+      // Payment has line items - use them to calculate refundability
+      // Only include items that are explicitly marked as refundable (true) or have no feeBreakdown info
+      // Items explicitly marked as non-refundable (false) are excluded
+      const refundableItems = payment.lineItems.filter((item: any) => {
+        // If no feeBreakdown or isRefundable is undefined/null, treat as refundable (default behavior)
+        if (!item.feeBreakdown || item.feeBreakdown.isRefundable === undefined || item.feeBreakdown.isRefundable === null) {
+          return true
+        }
+        // Otherwise, only include if explicitly true
+        return item.feeBreakdown.isRefundable === true
+      })
+
+      refundableAmount = refundableItems.reduce((sum: number, item: any) => sum + item.amount, 0)
+    } else {
+      // Payment doesn't have line items
+      // If the fee template has non-refundable items, we can't determine what this payment
+      // was for, so we must block refunds to be safe (user needs to verify manually)
+      if (refundableInfo.hasNonRefundableItems) {
+        refundableAmount = 0
+      }
+      // Otherwise, if all items are refundable, allow full refund
+    }
+
+    // Subtract already refunded amount
+    const totalRefunded = payment.refundAmount || 0
+    return Math.max(0, refundableAmount - totalRefunded)
+  }
+
+  // Get reason why payment cannot be refunded
+  const getRefundBlockedReason = (payment: any) => {
+    if (!payment) return ''
+
+    if (payment.lineItems && payment.lineItems.length > 0) {
+      const hasAnyRefundable = payment.lineItems.some((item: any) => item.feeBreakdown?.isRefundable !== false)
+      if (!hasAnyRefundable) {
+        return 'All items in this payment are non-refundable'
+      }
+      return 'No refundable amount remaining'
+    } else {
+      if (refundableInfo.hasNonRefundableItems) {
+        return 'Cannot verify refundability - payment missing line item details'
+      }
+      return 'No refundable amount remaining'
+    }
   }
 
   const openEditRemarksDialog = (payment: any) => {
@@ -772,10 +884,28 @@ export default function StudentPaymentsPage() {
     }).format(amount)
   }
 
-  // Check if fee template has non-refundable items
-  const hasNonRefundableFees = feeStatus?.feeTemplate?.breakdowns?.some(
-    (breakdown: any) => breakdown.isRefundable === false
-  ) || false
+  // Calculate refundable portion of fees
+  const refundableInfo = useMemo(() => {
+    if (!feeStatus?.feeTemplate?.breakdowns) {
+      return { hasNonRefundableItems: false, refundablePercentage: 1, refundableAmount: 0, nonRefundableAmount: 0 }
+    }
+
+    const breakdowns = feeStatus.feeTemplate.breakdowns
+    const totalAmount = feeStatus.totalDue || 0
+    const refundableAmount = breakdowns
+      .filter((b: any) => b.isRefundable !== false)
+      .reduce((sum: number, b: any) => sum + b.amount, 0)
+    const nonRefundableAmount = breakdowns
+      .filter((b: any) => b.isRefundable === false)
+      .reduce((sum: number, b: any) => sum + b.amount, 0)
+
+    return {
+      hasNonRefundableItems: nonRefundableAmount > 0,
+      refundablePercentage: totalAmount > 0 ? refundableAmount / totalAmount : 1,
+      refundableAmount,
+      nonRefundableAmount,
+    }
+  }, [feeStatus?.feeTemplate?.breakdowns, feeStatus?.totalDue])
 
   // Calculate optional fees totals
   const optionalFeesTotal = useMemo(() => {
@@ -817,7 +947,7 @@ export default function StudentPaymentsPage() {
   if (!feeStatus) {
     return (
       <div className="min-h-screen bg-slate-50 pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 pt-6 space-y-6">
           <div className="flex items-center justify-center h-96">
             <div className="text-center">
               <p className="text-gray-500 mb-2">Loading fee information...</p>
@@ -837,7 +967,7 @@ export default function StudentPaymentsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 pt-6 space-y-6">
         {/* Header Section */}
         <div>
           <Button
@@ -908,11 +1038,11 @@ export default function StudentPaymentsPage() {
         )}
 
         {/* Non-Refundable Fees Warning */}
-        {hasNonRefundableFees && (
+        {refundableInfo.hasNonRefundableItems && (
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <span className="font-medium">Non-Refundable Fees:</span> This fee template contains items that cannot be refunded. Refund functionality is disabled for payments.
+              <span className="font-medium">Partial Refundability:</span> This fee template contains {formatCurrency(refundableInfo.nonRefundableAmount)} in non-refundable items. Refundable items ({formatCurrency(refundableInfo.refundableAmount)}) can be refunded at 100%, but non-refundable items cannot be refunded.
             </AlertDescription>
           </Alert>
         )}
@@ -1437,7 +1567,7 @@ export default function StudentPaymentsPage() {
                               {payment.referenceNumber || 'N/A'}
                             </div>
                           </TableCell>
-                          <TableCell className="max-w-xs">
+                          <TableCell>
                             {payment.remarks && (
                               <div className="text-sm text-slate-700">{payment.remarks}</div>
                             )}
@@ -1514,25 +1644,48 @@ export default function StudentPaymentsPage() {
                             {payment.referenceNumber || 'N/A'}
                           </div>
                         </TableCell>
-                        <TableCell className="max-w-xs">
+                        <TableCell>
                           <div className="space-y-2">
                             {payment.remarks && (
                               <div className="text-sm text-slate-700">{payment.remarks}</div>
                             )}
-                            {payment.lineItems && payment.lineItems.length > 0 && (
-                              <div className="bg-slate-50 rounded-lg p-2 space-y-1.5">
-                                <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                            {payment.lineItems && payment.lineItems.length > 0 ? (
+                              <div className="bg-slate-50 rounded-lg p-2.5 space-y-0.5">
+                                <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
                                   Line Items
                                 </div>
-                                {payment.lineItems.map((item: any) => (
-                                  <div key={item.id} className="flex justify-between gap-3 text-xs">
-                                    <span className="text-slate-700">• {item.description}</span>
-                                    <span className="font-mono font-medium text-slate-900">
-                                      {formatCurrency(item.amount)}
-                                    </span>
-                                  </div>
-                                ))}
+                                {payment.lineItems.map((item: any) => {
+                                  const category = item.feeBreakdown?.category || 'MISC'
+                                  const categoryColors: Record<string, string> = {
+                                    TUITION: 'text-blue-600 bg-blue-50',
+                                    REGISTRATION: 'text-purple-600 bg-purple-50',
+                                    BOOKS: 'text-green-600 bg-green-50',
+                                    MISC: 'text-slate-600 bg-slate-50',
+                                    LAB: 'text-orange-600 bg-orange-50',
+                                  }
+
+                                  return (
+                                    <div key={item.id} className="flex items-center gap-2 flex-wrap py-1">
+                                      <span className="text-xs font-medium text-slate-700">
+                                        • {item.description}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-xs px-1.5 py-0.5 ${categoryColors[category] || categoryColors.MISC}`}
+                                      >
+                                        {category.replace('_', ' ')}
+                                      </Badge>
+                                    </div>
+                                  )
+                                })}
                               </div>
+                            ) : (
+                              refundableInfo.hasNonRefundableItems && (
+                                <Badge variant="outline" className="text-xs border-amber-600 text-amber-700 bg-amber-50">
+                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  No line items - refunds restricted
+                                </Badge>
+                              )
                             )}
                           </div>
                         </TableCell>
@@ -1569,16 +1722,16 @@ export default function StudentPaymentsPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => !hasNonRefundableFees && openRefundDialog(payment)}
-                                  disabled={hasNonRefundableFees}
+                                  onClick={() => openRefundDialog(payment)}
+                                  disabled={getMaxRefundableAmount(payment) <= 0}
                                   className="text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   <Minus className="h-3 w-3 mr-1" />
                                   Refund
                                 </Button>
-                                {hasNonRefundableFees && (
+                                {getMaxRefundableAmount(payment) <= 0 && (
                                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    This is marked as a non-refundable field
+                                    {getRefundBlockedReason(payment)}
                                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
                                   </div>
                                 )}
@@ -1619,7 +1772,7 @@ export default function StudentPaymentsPage() {
                                 {refund.referenceNumber || 'N/A'}
                               </div>
                             </TableCell>
-                            <TableCell className="max-w-xs">
+                            <TableCell>
                               <div className="text-sm font-medium text-red-700">
                                 {refund.reason}
                               </div>
@@ -1797,20 +1950,29 @@ export default function StudentPaymentsPage() {
                     <div className="divide-y pr-2">
                     {/* Base Fee Breakdowns */}
                     {feeStatus?.feeTemplate?.breakdowns && feeStatus.feeTemplate.breakdowns
-                      .filter((breakdown: any) =>
-                        breakdown.description.toLowerCase().includes(feeItemSearch.toLowerCase()) ||
-                        breakdown.category.toLowerCase().includes(feeItemSearch.toLowerCase())
-                      )
+                      .filter((breakdown: any) => {
+                        // Filter by search
+                        const matchesSearch = breakdown.description.toLowerCase().includes(feeItemSearch.toLowerCase()) ||
+                          breakdown.category.toLowerCase().includes(feeItemSearch.toLowerCase())
+
+                        // Filter out fully paid items
+                        const paidAmount = paidByBreakdown[breakdown.id] || 0
+                        const isFullyPaid = paidAmount >= breakdown.amount
+
+                        return matchesSearch && !isFullyPaid
+                      })
                       .map((breakdown: any) => {
+                      const paidAmount = paidByBreakdown[breakdown.id] || 0
+                      const remainingBalance = breakdown.amount - paidAmount
                       const isSelected = selectedLineItems[breakdown.id] !== undefined
-                      const selectedAmount = selectedLineItems[breakdown.id] || breakdown.amount
+                      const selectedAmount = selectedLineItems[breakdown.id] || remainingBalance
 
                       return (
                         <div key={breakdown.id} className="p-3 hover:bg-slate-50">
                           <div className="flex items-start gap-3">
                             <Checkbox
                               checked={isSelected}
-                              onCheckedChange={() => toggleLineItem(breakdown.id, breakdown.amount, false)}
+                              onCheckedChange={() => toggleLineItem(breakdown.id, remainingBalance, false)}
                             />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-2">
@@ -1819,8 +1981,14 @@ export default function StudentPaymentsPage() {
                                   {breakdown.category}
                                 </Badge>
                               </div>
-                              <div className="text-xs text-slate-600 mt-1">
-                                Full Amount: {formatCurrency(breakdown.amount)}
+                              <div className="text-xs text-slate-600 mt-1 space-y-0.5">
+                                <div>Full Amount: {formatCurrency(breakdown.amount)}</div>
+                                {paidAmount > 0 && (
+                                  <>
+                                    <div className="text-green-600">Paid: {formatCurrency(paidAmount)}</div>
+                                    <div className="font-medium text-orange-600">Remaining: {formatCurrency(remainingBalance)}</div>
+                                  </>
+                                )}
                               </div>
                               {isSelected && (
                                 <div className="mt-2">
@@ -1835,7 +2003,7 @@ export default function StudentPaymentsPage() {
                                     className="mt-1 h-8 text-sm font-mono"
                                   />
                                   <p className="text-xs text-slate-500 mt-1">
-                                    Max: {formatCurrency(breakdown.amount)}
+                                    Max: {formatCurrency(remainingBalance)}
                                   </p>
                                 </div>
                               )}
@@ -2240,9 +2408,44 @@ export default function StudentPaymentsPage() {
                     <span className="text-slate-600">Already Refunded:</span>
                     <span className="font-medium text-red-600">{formatCurrency(selectedPayment.refundAmount || 0)}</span>
                   </div>
+                  {(() => {
+                    // Calculate payment-specific refundability
+                    if (selectedPayment.lineItems && selectedPayment.lineItems.length > 0) {
+                      // Use same logic as getMaxRefundableAmount
+                      const refundableItems = selectedPayment.lineItems.filter((item: any) => {
+                        if (!item.feeBreakdown || item.feeBreakdown.isRefundable === undefined || item.feeBreakdown.isRefundable === null) {
+                          return true
+                        }
+                        return item.feeBreakdown.isRefundable === true
+                      })
+
+                      const nonRefundableItems = selectedPayment.lineItems.filter((item: any) =>
+                        item.feeBreakdown?.isRefundable === false
+                      )
+
+                      const refundableAmount = refundableItems.reduce((sum: number, item: any) => sum + item.amount, 0)
+                      const nonRefundableAmount = nonRefundableItems.reduce((sum: number, item: any) => sum + item.amount, 0)
+
+                      if (nonRefundableItems.length > 0) {
+                        return (
+                          <>
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-slate-600">Refundable Items:</span>
+                              <span className="font-medium text-green-600">{formatCurrency(refundableAmount)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-slate-600">Non-Refundable Items:</span>
+                              <span className="font-medium text-red-600">{formatCurrency(nonRefundableAmount)}</span>
+                            </div>
+                          </>
+                        )
+                      }
+                    }
+                    return null
+                  })()}
                   <div className="flex justify-between items-center text-sm border-t pt-2">
-                    <span className="text-slate-600 font-medium">Available to Refund:</span>
-                    <span className="font-semibold">{formatCurrency(selectedPayment.amountPaid - (selectedPayment.refundAmount || 0))}</span>
+                    <span className="text-slate-600 font-medium">Maximum Refundable:</span>
+                    <span className="font-semibold text-green-600">{formatCurrency(getMaxRefundableAmount(selectedPayment))}</span>
                   </div>
                 </div>
 
@@ -2269,7 +2472,7 @@ export default function StudentPaymentsPage() {
                       </p>
                     ) : (
                       <p className="text-xs text-slate-500 mt-1">
-                        Max: {formatCurrency(selectedPayment.amountPaid - (selectedPayment.refundAmount || 0))}
+                        Max: {formatCurrency(getMaxRefundableAmount(selectedPayment))}
                       </p>
                     )}
                   </div>

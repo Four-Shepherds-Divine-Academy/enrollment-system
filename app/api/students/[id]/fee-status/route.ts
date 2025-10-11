@@ -186,6 +186,7 @@ export async function GET(
                 description: true,
                 category: true,
                 amount: true,
+                isRefundable: true,
               },
             },
           },

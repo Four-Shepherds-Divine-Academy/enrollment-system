@@ -92,6 +92,7 @@ export async function GET(
                 description: true,
                 category: true,
                 amount: true,
+                isRefundable: true,
               },
             },
           },
@@ -129,6 +130,76 @@ export async function POST(
 
     const session = await auth()
     const createdBy = session?.user?.id || session?.user?.email || 'system'
+
+    // Validate line items to prevent overpayment
+    if (validatedData.lineItems && validatedData.lineItems.length > 0) {
+      // Get all existing payments for this student and academic year
+      const existingPayments = await prisma.payment.findMany({
+        where: {
+          studentId,
+          academicYearId: validatedData.academicYearId,
+        },
+        include: {
+          lineItems: true,
+          refunds: true,
+        },
+      })
+
+      // Calculate already paid amounts per breakdown
+      const paidByBreakdown: Record<string, number> = {}
+      existingPayments.forEach(payment => {
+        if (payment.lineItems && payment.lineItems.length > 0) {
+          payment.lineItems.forEach(lineItem => {
+            if (!paidByBreakdown[lineItem.feeBreakdownId]) {
+              paidByBreakdown[lineItem.feeBreakdownId] = 0
+            }
+            paidByBreakdown[lineItem.feeBreakdownId] += lineItem.amount
+          })
+        }
+        // Subtract refunds proportionally
+        if (payment.refunds && payment.refunds.length > 0) {
+          payment.refunds.forEach(refund => {
+            if (payment.lineItems && payment.lineItems.length > 0) {
+              const totalPaid = payment.lineItems.reduce((sum, item) => sum + item.amount, 0)
+              payment.lineItems.forEach(lineItem => {
+                const proportion = lineItem.amount / totalPaid
+                const refundAmount = refund.amount * proportion
+                if (paidByBreakdown[lineItem.feeBreakdownId]) {
+                  paidByBreakdown[lineItem.feeBreakdownId] -= refundAmount
+                }
+              })
+            }
+          })
+        }
+      })
+
+      // Validate each line item
+      for (const item of validatedData.lineItems) {
+        const breakdown = await prisma.feeBreakdown.findUnique({
+          where: { id: item.feeBreakdownId },
+          select: { amount: true, description: true },
+        })
+
+        if (!breakdown) {
+          return NextResponse.json(
+            { error: `Fee breakdown ${item.feeBreakdownId} not found` },
+            { status: 400 }
+          )
+        }
+
+        const alreadyPaid = paidByBreakdown[item.feeBreakdownId] || 0
+        const remainingBalance = breakdown.amount - alreadyPaid
+
+        if (item.amount > remainingBalance) {
+          return NextResponse.json(
+            {
+              error: `Payment amount for "${breakdown.description}" exceeds remaining balance of ₱${remainingBalance.toFixed(2)}. Already paid: ₱${alreadyPaid.toFixed(2)}`
+            },
+            { status: 400 }
+          )
+        }
+      }
+    }
 
     // Create payment record with line items
     const payment = await prisma.payment.create({
@@ -226,45 +297,93 @@ export async function PATCH(
       )
     }
 
-    // Check if the fee template allows refunds
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-      select: { gradeLevel: true },
-    })
-
-    if (student) {
-      const feeTemplate = await prisma.feeTemplate.findUnique({
-        where: {
-          gradeLevel_academicYearId: {
-            gradeLevel: student.gradeLevel,
-            academicYearId: payment.academicYearId,
+    // Calculate refundable portion of payment based on line items
+    const paymentWithLineItems = await prisma.payment.findUnique({
+      where: { id: validatedData.paymentId },
+      include: {
+        lineItems: {
+          include: {
+            feeBreakdown: {
+              select: {
+                isRefundable: true,
+              },
+            },
           },
         },
-        include: {
-          breakdowns: true,
-        },
+        refunds: true,
+      },
+    })
+
+    if (!paymentWithLineItems) {
+      return NextResponse.json(
+        { error: 'Payment not found' },
+        { status: 404 }
+      )
+    }
+
+    // Calculate refundable amount from line items
+    let refundableAmount = paymentWithLineItems.amountPaid
+    if (paymentWithLineItems.lineItems && paymentWithLineItems.lineItems.length > 0) {
+      // Payment has line items - use them to determine refundability
+      // Only include items that are explicitly marked as refundable (true) or have no feeBreakdown info
+      // Items explicitly marked as non-refundable (false) are EXCLUDED
+      refundableAmount = paymentWithLineItems.lineItems
+        .filter((item) => {
+          // If no feeBreakdown or isRefundable is undefined/null, treat as refundable (default)
+          if (!item.feeBreakdown || item.feeBreakdown.isRefundable === undefined || item.feeBreakdown.isRefundable === null) {
+            return true
+          }
+          // Otherwise, only include if explicitly true
+          return item.feeBreakdown.isRefundable === true
+        })
+        .reduce((sum, item) => sum + item.amount, 0)
+    } else {
+      // Payment doesn't have line items - check fee template to determine if refunds are allowed
+      // Get the student's grade level and fee template
+      const student = await prisma.student.findUnique({
+        where: { id: studentId },
+        select: { gradeLevel: true },
       })
 
-      // Check if any fee breakdown is non-refundable
-      const hasNonRefundableFees = feeTemplate?.breakdowns.some(
-        (breakdown) => breakdown.isRefundable === false
-      )
+      if (student) {
+        const feeTemplate = await prisma.feeTemplate.findUnique({
+          where: {
+            gradeLevel_academicYearId: {
+              gradeLevel: student.gradeLevel,
+              academicYearId: payment.academicYearId,
+            },
+          },
+          include: {
+            breakdowns: {
+              select: {
+                isRefundable: true,
+              },
+            },
+          },
+        })
 
-      if (hasNonRefundableFees) {
-        return NextResponse.json(
-          { error: 'This payment contains non-refundable fee items and cannot be refunded. Please contact administration for assistance.' },
-          { status: 400 }
-        )
+        // If template has any non-refundable items, block refunds for payments without line items
+        // (we can't determine what the payment was for)
+        if (feeTemplate?.breakdowns.some((breakdown) => breakdown.isRefundable === false)) {
+          refundableAmount = 0
+        }
       }
     }
 
     // Calculate total refunded so far
-    const totalRefunded = payment.refunds.reduce((sum, refund) => sum + refund.amount, 0)
-    const netPayment = payment.amountPaid - totalRefunded
+    const totalRefunded = paymentWithLineItems.refunds.reduce((sum, refund) => sum + refund.amount, 0)
+    const maxRefundableAmount = refundableAmount - totalRefunded
 
-    if (validatedData.refundAmount > netPayment) {
+    if (maxRefundableAmount <= 0) {
       return NextResponse.json(
-        { error: `Refund amount cannot exceed net payment of ${netPayment}` },
+        { error: 'This payment has no refundable amount remaining (all refundable items have been refunded or payment contains only non-refundable items).' },
+        { status: 400 }
+      )
+    }
+
+    if (validatedData.refundAmount > maxRefundableAmount) {
+      return NextResponse.json(
+        { error: `Refund amount cannot exceed the refundable portion of ${maxRefundableAmount}. This payment includes non-refundable fee items.` },
         { status: 400 }
       )
     }
