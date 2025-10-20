@@ -1,20 +1,10 @@
-import { auth } from '@/auth'
-import { NextResponse } from 'next/server'
+import NextAuth from 'next-auth'
+import { authConfig } from './auth.config'
 
-export default auth((req) => {
-  const isAdminRoute = req.nextUrl.pathname.startsWith('/admin')
-  const isLoginPage = req.nextUrl.pathname === '/admin/login'
+// Use the lightweight auth config for Edge Runtime
+const { auth } = NextAuth(authConfig)
 
-  if (isAdminRoute && !isLoginPage && !req.auth) {
-    return NextResponse.redirect(new URL('/admin/login', req.url))
-  }
-
-  if (isLoginPage && req.auth) {
-    return NextResponse.redirect(new URL('/admin/dashboard', req.url))
-  }
-
-  return NextResponse.next()
-})
+export default auth
 
 export const config = {
   matcher: ['/admin/:path*'],

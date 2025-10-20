@@ -1,10 +1,12 @@
 import NextAuth from 'next-auth'
-import type { NextAuthConfig } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { authConfig } from './auth.config'
 
-const authConfig: NextAuthConfig = {
+// This file uses Node.js runtime and can include heavy dependencies like Prisma
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -42,25 +44,4 @@ const authConfig: NextAuthConfig = {
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.userId = user.id
-        token.userRole = user.role
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (session.user && token.userId) {
-        session.user.id = token.userId as string
-        session.user.role = token.userRole as string
-      }
-      return session
-    },
-  },
-  pages: {
-    signIn: '/admin/login',
-  },
-}
-
-export const { handlers, signIn, signOut, auth } = NextAuth(authConfig)
+})
