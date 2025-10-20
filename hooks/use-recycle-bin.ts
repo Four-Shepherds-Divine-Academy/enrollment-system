@@ -65,18 +65,12 @@ export function useRestoreItem() {
       }
       return res.json()
     },
-    onMutate: async (id) => {
+    onMutate: async () => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['recycle-bin'] })
 
       // Snapshot the previous value
       const previousItems = queryClient.getQueriesData({ queryKey: ['recycle-bin'] })
-
-      // Optimistically update to remove the item
-      queryClient.setQueriesData({ queryKey: ['recycle-bin'] }, (old: RecycleBinItem[] | undefined) => {
-        if (!old) return []
-        return old.filter((item) => item.id !== id)
-      })
 
       return { previousItems }
     },
@@ -91,7 +85,7 @@ export function useRestoreItem() {
       queryClient.invalidateQueries({ queryKey: ['custom-remarks'] })
       toast.success('Item restored successfully')
     },
-    onError: (error, id, context) => {
+    onError: (error, _id, context) => {
       // Rollback on error
       if (context?.previousItems) {
         context.previousItems.forEach(([queryKey, data]) => {
@@ -118,18 +112,12 @@ export function usePermanentlyDeleteItem() {
       }
       return res.json()
     },
-    onMutate: async (id) => {
+    onMutate: async () => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['recycle-bin'] })
 
       // Snapshot the previous value
       const previousItems = queryClient.getQueriesData({ queryKey: ['recycle-bin'] })
-
-      // Optimistically update to remove the item
-      queryClient.setQueriesData({ queryKey: ['recycle-bin'] }, (old: RecycleBinItem[] | undefined) => {
-        if (!old) return []
-        return old.filter((item) => item.id !== id)
-      })
 
       return { previousItems }
     },
@@ -137,7 +125,7 @@ export function usePermanentlyDeleteItem() {
       queryClient.invalidateQueries({ queryKey: ['recycle-bin'] })
       toast.success('Item permanently deleted')
     },
-    onError: (error, id, context) => {
+    onError: (error, _id, context) => {
       // Rollback on error
       if (context?.previousItems) {
         context.previousItems.forEach(([queryKey, data]) => {

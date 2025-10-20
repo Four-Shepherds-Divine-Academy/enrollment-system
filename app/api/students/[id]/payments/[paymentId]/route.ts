@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { auth } from '@/auth'
 
 const updateRemarksSchema = z.object({
   remarks: z.string().optional().nullable(),
@@ -16,9 +15,6 @@ export async function PATCH(
     const { id: studentId, paymentId } = await params
     const body = await request.json()
     const validatedData = updateRemarksSchema.parse(body)
-
-    const session = await auth()
-    const updatedBy = session?.user?.id || session?.user?.email || 'system'
 
     // Verify payment belongs to student
     const existingPayment = await prisma.payment.findUnique({
@@ -65,7 +61,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation failed', details: error.errors },
+        { error: 'Validation failed', details: error.issues },
         { status: 400 }
       )
     }

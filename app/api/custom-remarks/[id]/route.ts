@@ -3,13 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { auth } from '@/auth'
 
-const updateRemarkSchema = z.object({
-  label: z.string().min(1, 'Label is required').optional(),
-  category: z.string().min(1, 'Category is required').optional(),
-  isActive: z.boolean().optional(),
-  sortOrder: z.number().optional(),
-})
-
 // PATCH update custom remark
 export async function PATCH(
   request: NextRequest,
@@ -20,6 +13,13 @@ export async function PATCH(
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const updateRemarkSchema = z.object({
+      label: z.string().min(1, 'Label is required').optional(),
+      category: z.string().min(1, 'Category is required').optional(),
+      isActive: z.boolean().optional(),
+      sortOrder: z.number().optional(),
+    })
 
     const { id } = await params
     const body = await request.json()
@@ -64,7 +64,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation error', details: error.errors },
+        { error: 'Validation error', details: error.issues },
         { status: 400 }
       )
     }
@@ -79,7 +79,7 @@ export async function PATCH(
 
 // DELETE custom remark - Soft delete (move to recycle bin)
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {

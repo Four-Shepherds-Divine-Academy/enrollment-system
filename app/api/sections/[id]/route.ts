@@ -4,8 +4,8 @@ import { prisma } from '@/lib/prisma';
 
 // GET /api/sections/[id] - Get a specific section
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -13,8 +13,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
     const section = await prisma.section.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
@@ -41,7 +42,7 @@ export async function GET(
 // PATCH /api/sections/[id] - Update a section
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -49,12 +50,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const { name, gradeLevel, isActive } = body;
 
     // Check if section exists
     const existingSection = await prisma.section.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingSection) {
@@ -72,7 +74,7 @@ export async function PATCH(
         },
       });
 
-      if (conflictingSection && conflictingSection.id !== params.id) {
+      if (conflictingSection && conflictingSection.id !== id) {
         return NextResponse.json(
           { error: 'Section with this name already exists for this grade level' },
           { status: 409 }
@@ -81,7 +83,7 @@ export async function PATCH(
     }
 
     const section = await prisma.section.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(name && { name }),
         ...(gradeLevel && { gradeLevel }),
@@ -108,8 +110,8 @@ export async function PATCH(
 
 // DELETE /api/sections/[id] - Soft delete a section (move to recycle bin)
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -117,9 +119,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
     // Check if section has students
     const section = await prisma.section.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
@@ -147,7 +150,7 @@ export async function DELETE(
     await prisma.recycleBin.create({
       data: {
         entityType: 'section',
-        entityId: params.id,
+        entityId: id,
         entityData: section,
         entityName: `${section.name} - ${section.gradeLevel}`,
         deletedBy: session.user?.email || session.user?.id,
@@ -156,7 +159,7 @@ export async function DELETE(
     });
 
     await prisma.section.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ message: 'Section deleted successfully' });

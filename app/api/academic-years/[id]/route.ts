@@ -18,12 +18,12 @@ const fullUpdateSchema = z.object({
 
 // PUT update academic year (full update)
 export async function PUT(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
     const { id } = await params
-    const body = await request.json()
+    const body = await _request.json()
     const validatedData = fullUpdateSchema.parse(body)
 
     const academicYear = await prisma.academicYear.update({
@@ -39,7 +39,7 @@ export async function PUT(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation failed', details: error.errors },
+        { error: 'Validation failed', details: error.issues },
         { status: 400 }
       )
     }
@@ -108,7 +108,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation failed', details: error.errors },
+        { error: 'Validation failed', details: error.issues },
         { status: 400 }
       )
     }
@@ -182,7 +182,7 @@ export async function POST(
 
 // DELETE academic year - Soft delete (move to recycle bin)
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {

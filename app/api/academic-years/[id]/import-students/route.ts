@@ -139,7 +139,7 @@ export async function POST(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation failed', details: error.errors },
+        { error: 'Validation failed', details: error.issues },
         { status: 400 }
       )
     }
@@ -222,7 +222,7 @@ export async function GET(
         lrn: enrollment.student.lrn,
         fullName: enrollment.student.fullName,
         gradeLevel: enrollment.student.gradeLevel,
-        section: enrollment.student.section,
+        section: enrollment.student.sectionId,
         currentGrade: enrollment.gradeLevel,
         nextGrade: getNextGradeLevel(enrollment.gradeLevel),
       }))

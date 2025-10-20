@@ -27,13 +27,6 @@ import { StudentRemarksField } from '@/components/student-remarks-field'
 
 type StudentFormData = z.infer<typeof studentSchema>
 
-type Student = StudentFormData & {
-  id: string
-  fullName: string
-  createdAt: string
-  updatedAt: string
-}
-
 const GRADE_LEVELS = [
   'Kinder 1',
   'Kinder 2',
@@ -103,7 +96,7 @@ export default function EditStudentPage() {
         firstName: student.firstName || '',
         middleName: student.middleName || '',
         lastName: student.lastName || '',
-        gender: student.gender || '',
+        gender: student.gender as "Male" | "Female",
         contactNumber: student.contactNumber || '',
         dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth).toISOString().split('T')[0] : '',
         houseNumber: student.houseNumber || '',
@@ -129,7 +122,7 @@ export default function EditStudentPage() {
         emergencyContactNumber: student.emergencyContactNumber || '',
         emergencyContactRelationship: student.emergencyContactRelationship || '',
         gradeLevel: student.gradeLevel || '',
-        enrollmentStatus: student.enrollmentStatus || 'PENDING',
+        enrollmentStatus: student.enrollmentStatus as "PENDING" | "ENROLLED" | "TRANSFERRED" | "DROPPED",
         isTransferee: student.isTransferee || false,
         previousSchool: student.previousSchool || '',
         remarks: student.remarks || '',
@@ -137,8 +130,8 @@ export default function EditStudentPage() {
 
       // Handle section separately
       if (student.section && typeof student.section === 'object') {
-        formData.section = student.section.id
-        setSectionValue(student.section.id)
+        formData.section = (student.section as any).id
+        setSectionValue((student.section as any).id)
       } else if (student.sectionId) {
         formData.section = student.sectionId
         setSectionValue(student.sectionId)
@@ -231,7 +224,7 @@ export default function EditStudentPage() {
         </div>
       </div>
 
-      <form id="edit-student-form" onSubmit={handleSubmit(onSubmit)}>
+      <form id="edit-student-form" onSubmit={handleSubmit(onSubmit as any)}>
         <Card>
           <CardHeader className="border-b">
             <CardTitle className="text-lg">Student Information</CardTitle>

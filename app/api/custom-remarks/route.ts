@@ -10,13 +10,6 @@ const createRemarkSchema = z.object({
   sortOrder: z.number().optional(),
 })
 
-const updateRemarkSchema = z.object({
-  label: z.string().min(1, 'Label is required').optional(),
-  category: z.string().min(1, 'Category is required').optional(),
-  isActive: z.boolean().optional(),
-  sortOrder: z.number().optional(),
-})
-
 // GET all custom remarks
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -105,7 +98,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation error', details: error.errors },
+        { error: 'Validation error', details: error.issues },
         { status: 400 }
       )
     }

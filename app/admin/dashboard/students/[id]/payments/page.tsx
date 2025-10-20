@@ -42,7 +42,6 @@ import {
   AlertCircle,
   Loader2,
   Search,
-  Filter,
   X,
   Calendar,
   Pencil,
@@ -341,7 +340,7 @@ export default function StudentPaymentsPage() {
           fullName: student.fullName,
           lrn: student.lrn,
           gradeLevel: student.gradeLevel,
-          section: student.section?.name || null,
+          section: (typeof student.section === 'object' ? ((student.section as any)?.name || null) : (typeof student.section === 'string' ? student.section : null)),
         },
         feeStatus,
         feeStatus.payments || [],
@@ -409,7 +408,6 @@ export default function StudentPaymentsPage() {
           paymentMethod,
           referenceNumber: finalReferenceNumber,
           remarks: paymentRemarks || undefined,
-          lineItems: baseLineItems.length > 0 ? baseLineItems : undefined,
         },
       })
 
@@ -2057,7 +2055,6 @@ export default function StudentPaymentsPage() {
                       .map((optFee: any) => {
                       const key = `optional-${optFee.id}`
                       const isSelected = selectedLineItems[key] !== undefined
-                      const selectedAmount = selectedLineItems[key] || optFee.amount
 
                       // Calculate unit price and remaining balance
                       let unitPrice = 0

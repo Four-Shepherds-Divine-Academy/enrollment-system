@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { Toaster } from 'sonner'
-import { prisma } from '@/lib/prisma'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import Image from 'next/image'
 import {
@@ -15,9 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
-  User,
   LogOut,
-  Settings,
   FileText,
   Home,
   Calendar,

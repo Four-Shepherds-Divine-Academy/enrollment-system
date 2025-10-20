@@ -64,7 +64,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (paymentStatus && paymentStatus.trim() !== '' && paymentStatus !== 'All Payment Status' && activeYear) {
       where.feeStatus = {
         some: {
-          paymentStatus: paymentStatus,
+          paymentStatus: paymentStatus as "PAID" | "PARTIAL" | "UNPAID" | "OVERPAID",
           academicYearId: activeYear.id,
         },
       }
@@ -330,7 +330,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation failed', details: error.errors },
+        { error: 'Validation failed', details: error.issues },
         { status: 400 }
       )
     }

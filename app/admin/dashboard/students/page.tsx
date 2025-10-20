@@ -200,11 +200,12 @@ export default function StudentsListPage() {
 
   // Group students by grade level and section (already filtered by API)
   const groupedStudents = students.reduce((acc, student) => {
-    const key = `${student.gradeLevel}${student.section ? ` - ${student.section.name}` : ''}`
+    const sectionName = (student.section && typeof student.section === 'object' ? (student.section as any).name : '') as string;
+    const key = `${student.gradeLevel}${sectionName ? ` - ${sectionName}` : ''}`
     if (!acc[key]) {
       acc[key] = []
     }
-    acc[key].push(student)
+    acc[key].push(student as any)
     return acc
   }, {} as Record<string, Student[]>)
 
@@ -254,7 +255,7 @@ export default function StudentsListPage() {
   const handleSwitchClick = (student: Student) => {
     setSelectedStudent(student)
     setNewGradeLevel(student.gradeLevel)
-    setNewSection(student.section || '')
+    setNewSection(student.section?.id || '')
     setSwitchDialogOpen(true)
   }
 
@@ -424,28 +425,6 @@ export default function StudentsListPage() {
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-    )
-  }
-
-  const getPaymentStatusBadge = (status: string, isLate: boolean = false) => {
-    const variants: Record<string, { className: string }> = {
-      PAID: { className: 'bg-green-100 text-green-700 border-green-300' },
-      PARTIAL: { className: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-      UNPAID: { className: 'bg-red-100 text-red-700 border-red-300' },
-      OVERPAID: { className: 'bg-blue-100 text-blue-700 border-blue-300' },
-    }
-    const config = variants[status] || variants.UNPAID
-    return (
-      <div className="flex items-center gap-1">
-        <Badge variant="outline" className={config.className}>
-          {status}
-        </Badge>
-        {isLate && (
-          <Badge variant="destructive" className="text-xs">
-            LATE
-          </Badge>
-        )}
-      </div>
     )
   }
 

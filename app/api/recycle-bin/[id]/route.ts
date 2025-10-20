@@ -4,7 +4,7 @@ import { auth } from '@/auth'
 
 // PATCH - Restore item from recycle bin
 export async function PATCH(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
@@ -167,7 +167,7 @@ export async function PATCH(
 
 // DELETE - Permanently delete item from recycle bin
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {

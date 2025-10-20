@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Bell, Check, Eye, EyeOff, X, UserPlus, Settings, AlertTriangle, Megaphone, MoreVertical } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-import { useNotificationsStore } from '@/store/notifications-store'
 import {
   useNotifications,
   useUnreadNotificationsCount,
@@ -93,8 +92,8 @@ export function NotificationCenter() {
     setActiveTab(value as 'all' | 'unread' | 'read')
   }
 
-  const getNotificationIcon = (type: NotificationType) => {
-    switch (type) {
+  const getNotificationIcon = (type: string) => {
+    switch (type as NotificationType) {
       case 'ENROLLMENT':
         return <UserPlus className="h-4 w-4 text-blue-600" />
       case 'SYSTEM':
@@ -152,7 +151,6 @@ export function NotificationCenter() {
     return null
   }
 
-  const unreadNotifications = notifications.filter(n => !n.isRead)
   const readNotifications = notifications.filter(n => n.isRead)
 
   return (
@@ -230,12 +228,12 @@ export function NotificationCenter() {
                     className={`px-4 py-2.5 border-b hover:bg-gray-50 transition-colors cursor-pointer ${
                       !notification.isRead ? 'bg-blue-50/50' : ''
                     }`}
-                    onClick={() => handleNotificationClick(notification)}
+                    onClick={() => handleNotificationClick(notification as any)}
                   >
                     <div className="flex items-start gap-2.5">
                       <div className="flex-shrink-0 mt-1">
                         <div className="p-1.5 rounded-full bg-blue-50">
-                          {getNotificationIcon(notification.type)}
+                          {getNotificationIcon((notification as any).type)}
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -243,15 +241,15 @@ export function NotificationCenter() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h4 className="font-medium text-sm text-gray-900">{notification.title}</h4>
-                              {getNotificationBadge(notification)}
+                              {getNotificationBadge(notification as any)}
                               {!notification.isRead && (
                                 <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
                               )}
                             </div>
-                            {notification.student && (
+                            {(notification as any).student && (
                               <p className="text-sm text-gray-700 mt-1">
-                                {notification.student.fullName} • {notification.student.gradeLevel}
-                                {notification.student.lrn && ` • ${notification.student.lrn}`}
+                                {(notification as any).student?.fullName} • {(notification as any).student?.gradeLevel}
+                                {(notification as any).student?.lrn && ` • ${(notification as any).student.lrn}`}
                               </p>
                             )}
                             <p className="text-xs text-gray-500 mt-1">

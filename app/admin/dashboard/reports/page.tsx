@@ -3,11 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { usePaymentHistory } from '@/hooks/use-fees'
-import { useFeeTemplates } from '@/hooks/use-fees'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
@@ -16,17 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { FileText, Download, Printer, Users, TrendingUp, UserCheck, UserX, DollarSign, Receipt, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import {
   BarChart,
   Bar,
@@ -39,8 +28,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
 } from 'recharts'
 
 type AcademicYear = {
@@ -84,8 +71,6 @@ const COLORS = {
   female: '#ec4899',
 }
 
-const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
-
 export default function ReportsPage() {
   const [selectedYearId, setSelectedYearId] = useState<string>('')
   const [activeTab, setActiveTab] = useState('enrollment')
@@ -108,11 +93,6 @@ export default function ReportsPage() {
 
   // Fetch payment history for selected year
   const { data: paymentHistory = [] } = usePaymentHistory({
-    academicYearId: selectedYearId || activeYear?.id,
-  })
-
-  // Fetch fee templates for selected year
-  const { data: feeTemplates = [] } = useFeeTemplates({
     academicYearId: selectedYearId || activeYear?.id,
   })
 
@@ -405,7 +385,10 @@ export default function ReportsPage() {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          label={(props: any) => {
+                            const { name, percent } = props;
+                            return `${name}: ${(percent * 100).toFixed(0)}%`;
+                          }}
                           outerRadius={100}
                           fill="#8884d8"
                           dataKey="value"
@@ -433,7 +416,10 @@ export default function ReportsPage() {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          label={(props: any) => {
+                            const { name, percent } = props;
+                            return `${name}: ${(percent * 100).toFixed(0)}%`;
+                          }}
                           outerRadius={100}
                           fill="#8884d8"
                           dataKey="value"
@@ -580,7 +566,10 @@ export default function ReportsPage() {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                            label={(props: any) => {
+                              const { name, percent } = props;
+                              return `${name}: ${(percent * 100).toFixed(0)}%`;
+                            }}
                             outerRadius={100}
                             fill="#8884d8"
                             dataKey="value"

@@ -47,7 +47,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 // POST - Clean up expired items (items past 30 days)
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export async function POST(_request: NextRequest): Promise<NextResponse> {
   try {
     const session = await auth()
     if (!session?.user) {
